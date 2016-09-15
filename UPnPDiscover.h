@@ -24,8 +24,7 @@ public:
 	// for every response received within the timeout, the callback is invoked
 	// if the callback returns false, discovery is terminated
 	// returns false if discovery failed; not receiving any response is NOT considered a failure
-	bool discover(TCallback callback, const char *st, int mx = 4,
-			unsigned long timeoutMillis = 5000);
+	bool discover(TCallback callback, const char *st, int mx = 4, unsigned long timeoutMillis = 5000);
 };
 
 #endif /* UPNPDISCOVER_H_ */

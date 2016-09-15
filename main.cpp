@@ -9,6 +9,8 @@
 #include <WString.h>
 
 #include "SonosDiscover.h"
+#include "SonosRenderingControl.h"
+#include "SonosZoneGroupTopology.h"
 
 #define WIFI_SSID "..."
 #define WIFI_PASS "..."
@@ -18,15 +20,6 @@
 HTTPClient http;
 ESP8266WebServer server(SUBSCRIBE_CALLBACK_PORT);
 
-String toStringIp(IPAddress ip) {
-  String res = "";
-  for (int i = 0; i < 3; i++) {
-    res += String((ip >> (8 * i)) & 0xFF) + ".";
-  }
-  res += String(((ip >> 8 * 3)) & 0xFF);
-  return res;
-}
-
 void setup() {
 	Serial.begin(115200);
 	delay(500);
@@ -35,45 +28,77 @@ void setup() {
 	digitalWrite(LED_BUILTIN, HIGH);
 
 	WiFi.mode(WIFI_STA);
-	Serial.print("Connecting to WiFi.");
+	Serial.print(F("Connecting to WiFi."));
 	WiFi.begin(WIFI_SSID, WIFI_PASS);
 	while (WiFi.status() != WL_CONNECTED) {
 		delay(1000);
-		Serial.print(".");
+		Serial.print('.');
 	}
-	Serial.println(" OK!");
+	Serial.println(F(" OK!"));
 	Serial.println(WiFi.localIP());
 	Serial.println(WiFi.SSID());
 	Serial.println(WiFi.macAddress());
 
+	const char *headers[] = { "SID" };
+	server.collectHeaders(headers, 1);
+
+	server.on("/", []() {
+		IPAddress clientIP = server.client().remoteIP();
+		String sid = server.header("SID");
+
+		Serial.print(F("received change from IP "));
+		Serial.print(clientIP.toString());
+		Serial.print(" with SID ");
+		Serial.println(sid);
+
+		digitalWrite(LED_BUILTIN, LOW);
+		server.send(HTTP_CODE_OK);
+		digitalWrite(LED_BUILTIN, HIGH);
+
+		/*
+		 Serial.println("Unsubscribing SID " + sid);
+		 http.begin("http://" + clientIP.toString() + ":1400/MediaRenderer/RenderingControl/Event");
+		 http.addHeader("HOST", clientIP.toString() + ":1400");
+		 http.addHeader("SID", sid);
+		 int result = http.sendRequest("UNSUBSCRIBE");
+		 Serial.println("result " + String(result));
+		 http.end();
+		 */
+	});
+	server.begin();
+
 	SonosDiscover discover;
 	IPAddress addr;
 	if (discover.discoverAny(&addr)) {
-		Serial.println("found a device: " + toStringIp(addr));
+		Serial.println("found a device: " + addr.toString());
 
-		server.on("/", HTTP_ANY, []() {
-			digitalWrite(LED_BUILTIN, LOW);
-			server.send(200);
-			digitalWrite(LED_BUILTIN, HIGH);
-			Serial.println("received change");
+		SonosZoneGroupTopology topo(addr);
+		bool discoverResult = topo.GetZoneGroupState_Decoded([](SonosZoneInfo info) {
+			Serial.print(info.uuid);
+			Serial.print(F(": "));
+			Serial.print(info.name);
+			Serial.print(F(" @ "));
+			info.playerIP.printTo(Serial);
+			Serial.println();
+
+			SonosRenderingControl rendering(info.playerIP);
+			rendering.GetVolume([](uint16_t volume) {
+						Serial.print(F("Current volume: "));
+						Serial.println(volume);
+					});
+
+			http.begin("http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event");
+			http.addHeader("NT", "upnp:event");
+			http.addHeader("Callback", "<http://" + WiFi.localIP().toString() + ":" + SUBSCRIBE_CALLBACK_PORT + ">");
+			http.addHeader("Content-Length", "0");
+			const char *headerKeys[] = {"SID"};
+			http.collectHeaders(headerKeys, 1);
+			int result = http.sendRequest("SUBSCRIBE");
+			Serial.println("result " + String(result));
+			Serial.println("Subscribed with SID " + http.header("SID"));
+			Serial.println(http.getString());
+			http.end();
 		});
-		server.begin();
-
-		http.begin(
-				"http://" + toStringIp(addr)
-						+ ":1400/MediaRenderer/RenderingControl/Event");
-		http.addHeader("NT", "upnp:event");
-		http.addHeader("Callback",
-				"<http://" + toStringIp(WiFi.localIP()) + ":"
-						+ SUBSCRIBE_CALLBACK_PORT + ">");
-		http.addHeader("Content-Length", "0");
-		const char *headerKeys[] = {"SID"};
-		http.collectHeaders(headerKeys, 1);
-		int result = http.sendRequest("SUBSCRIBE");
-		Serial.println("result " + String(result));
-		Serial.println("Subscribed with SID " + http.header("SID"));
-		Serial.println(http.getString());
-		http.end();
 	}
 }
 

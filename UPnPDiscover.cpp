@@ -21,8 +21,7 @@ UPnPDiscover::UPnPDiscover() {
 UPnPDiscover::~UPnPDiscover() {
 }
 
-bool UPnPDiscover::discover(UPnPDiscover::TCallback callback, const char *st,
-		int mx, unsigned long timeoutMillis) {
+bool UPnPDiscover::discover(UPnPDiscover::TCallback callback, const char *st, int mx, unsigned long timeoutMillis) {
 	WiFiUDP udp;
 
 	// start UDP connection on a random port
@@ -33,8 +32,7 @@ bool UPnPDiscover::discover(UPnPDiscover::TCallback callback, const char *st,
 	}
 
 	// UPnP mandates a TTL value of 4
-	if (!udp.beginPacketMulticast(IPAddress(239, 255, 255, 250), 1900,
-			WiFi.localIP(), 4)) {
+	if (!udp.beginPacketMulticast(IPAddress(239, 255, 255, 250), 1900, WiFi.localIP(), 4)) {
 		Serial.println(F("udp.beginPacketMulticast failed"));
 		udp.stop();
 		return false;
