@@ -1,11 +1,11 @@
 /*
- * UPnPDiscover.cpp
+ * Discover.cpp
  *
  *  Created on: 10 Sep 2016
  *      Author: chschu
  */
 
-#include "UPnPDiscover.h"
+#include "Discover.h"
 
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
@@ -15,13 +15,15 @@
 #include <WiFiUdp.h>
 #include <WString.h>
 
-UPnPDiscover::UPnPDiscover() {
+namespace UPnP {
+
+Discover::Discover() {
 }
 
-UPnPDiscover::~UPnPDiscover() {
+Discover::~Discover() {
 }
 
-bool UPnPDiscover::discover(UPnPDiscover::TCallback callback, const char *st, int mx, unsigned long timeoutMillis) {
+bool Discover::discover(DiscoverCallback callback, const char *st, int mx, unsigned long timeoutMillis) {
 	WiFiUDP udp;
 
 	// start UDP connection on a random port
@@ -69,4 +71,6 @@ bool UPnPDiscover::discover(UPnPDiscover::TCallback callback, const char *st, in
 
 	udp.stop();
 	return true;
+}
+
 }

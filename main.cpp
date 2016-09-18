@@ -6,11 +6,13 @@
 #include <HardwareSerial.h>
 #include <include/wl_definitions.h>
 #include <IPAddress.h>
+#include <WiFiClient.h>
 #include <WString.h>
+#include <cstdint>
 
-#include "SonosDiscover.h"
-#include "SonosRenderingControl.h"
-#include "SonosZoneGroupTopology.h"
+#include "Sonos/Discover.h"
+#include "Sonos/RenderingControl.h"
+#include "Sonos/ZoneGroupTopology.h"
 
 #define WIFI_SSID "..."
 #define WIFI_PASS "..."
@@ -67,38 +69,40 @@ void setup() {
 	});
 	server.begin();
 
-	SonosDiscover discover;
+	Sonos::Discover discover;
 	IPAddress addr;
 	if (discover.discoverAny(&addr)) {
 		Serial.println("found a device: " + addr.toString());
 
-		SonosZoneGroupTopology topo(addr);
-		bool discoverResult = topo.GetZoneGroupState_Decoded([](SonosZoneInfo info) {
-			Serial.print(info.uuid);
-			Serial.print(F(": "));
-			Serial.print(info.name);
-			Serial.print(F(" @ "));
-			info.playerIP.printTo(Serial);
-			Serial.println();
+		Sonos::ZoneGroupTopology topo(addr);
+		bool discoverResult =
+				topo.GetZoneGroupState_Decoded(
+						[](Sonos::ZoneInfo info) {
+							Serial.print(info.uuid);
+							Serial.print(F(": "));
+							Serial.print(info.name);
+							Serial.print(F(" @ "));
+							info.playerIP.printTo(Serial);
+							Serial.println();
 
-			SonosRenderingControl rendering(info.playerIP);
-			rendering.GetVolume([](uint16_t volume) {
-						Serial.print(F("Current volume: "));
-						Serial.println(volume);
-					});
+							Sonos::RenderingControl rendering(info.playerIP);
+							rendering.GetVolume([](uint16_t volume) {
+										Serial.print(F("Current volume: "));
+										Serial.println(volume);
+									});
 
-			http.begin("http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event");
-			http.addHeader("NT", "upnp:event");
-			http.addHeader("Callback", "<http://" + WiFi.localIP().toString() + ":" + SUBSCRIBE_CALLBACK_PORT + ">");
-			http.addHeader("Content-Length", "0");
-			const char *headerKeys[] = {"SID"};
-			http.collectHeaders(headerKeys, 1);
-			int result = http.sendRequest("SUBSCRIBE");
-			Serial.println("result " + String(result));
-			Serial.println("Subscribed with SID " + http.header("SID"));
-			Serial.println(http.getString());
-			http.end();
-		});
+							http.begin("http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event");
+							http.addHeader("NT", "upnp:event");
+							http.addHeader("Callback", "<http://" + WiFi.localIP().toString() + ":" + SUBSCRIBE_CALLBACK_PORT + ">");
+							http.addHeader("Content-Length", "0");
+							const char *headerKeys[] = {"SID"};
+							http.collectHeaders(headerKeys, 1);
+							int result = http.sendRequest("SUBSCRIBE");
+							Serial.println("result " + String(result));
+							Serial.println("Subscribed with SID " + http.header("SID"));
+							Serial.println(http.getString());
+							http.end();
+						});
 	}
 }
 

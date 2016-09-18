@@ -1,17 +1,19 @@
 /*
- * SonosZoneGroupTopology.cpp
+ * ZoneGroupTopology.cpp
  *
  *  Created on: 12 Sep 2016
  *      Author: chschu
  */
 
-#include "SonosZoneGroupTopology.h"
+#include "ZoneGroupTopology.h"
 
 #include <ESP8266HTTPClient.h>
 #include <HardwareSerial.h>
 #include <pgmspace.h>
 #include <stddef.h>
 #include <WiFiClient.h>
+
+namespace Sonos {
 
 const char GET_ZONE_GROUP_STATE[] PROGMEM
 		= "<?xml version=\"1.0\"?>"
@@ -22,11 +24,11 @@ const char GET_ZONE_GROUP_STATE[] PROGMEM
 				"</s:Body>"
 				"</s:Envelope>";
 
-SonosZoneGroupTopology::SonosZoneGroupTopology(IPAddress deviceIP) :
+ZoneGroupTopology::ZoneGroupTopology(IPAddress deviceIP) :
 		_deviceIP(deviceIP) {
 }
 
-SonosZoneGroupTopology::~SonosZoneGroupTopology() {
+ZoneGroupTopology::~ZoneGroupTopology() {
 }
 
 void replaceXmlEntities(String &s) {
@@ -79,7 +81,7 @@ bool extractEncodedTags(Stream &stream, std::function<void(String tag)> callback
 	return true;
 }
 
-bool SonosZoneGroupTopology::GetZoneGroupState_Decoded(SonosZoneInfoCallback callback, bool visibleOnly) {
+bool ZoneGroupTopology::GetZoneGroupState_Decoded(ZoneInfoCallback callback, bool visibleOnly) {
 	HTTPClient client;
 	client.begin(_deviceIP.toString(), 1400, F("/ZoneGroupTopology/Control"));
 	client.addHeader(F("SOAPACTION"), F("urn:schemas-upnp-org:service:ZoneGroupTopology:1#GetZoneGroupState"));
@@ -97,7 +99,7 @@ bool SonosZoneGroupTopology::GetZoneGroupState_Decoded(SonosZoneInfoCallback cal
 
 	bool result = extractEncodedTags(stream, [callback, visibleOnly](String tag) {
 		if (tag.startsWith(F("<Satellite ")) || tag.startsWith(F("<ZoneGroupMember "))) {
-			SonosZoneInfo info;
+			ZoneInfo info;
 
 			bool visible = tag.indexOf(F(" Invisible=\"1\"")) < 0;
 
@@ -131,3 +133,4 @@ bool SonosZoneGroupTopology::GetZoneGroupState_Decoded(SonosZoneInfoCallback cal
 	return result;
 }
 
+}

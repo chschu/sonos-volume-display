@@ -1,20 +1,22 @@
 /*
- * SonosRenderingControl.cpp
+ * RenderingControl.cpp
  *
  *  Created on: 12 Sep 2016
  *      Author: chschu
  */
 
-#include "SonosRenderingControl.h"
+#include "RenderingControl.h"
 
 #include <ESP8266HTTPClient.h>
 #include <HardwareSerial.h>
-#include <IPAddress.h>
+#include <pgmspace.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <WiFiClient.h>
 #include <WString.h>
-#include <cstdint>
 #include <cstring>
+
+namespace Sonos {
 
 const char GET_VOLUME[] PROGMEM
 		= "<?xml version=\"1.0\"?>"
@@ -27,14 +29,14 @@ const char GET_VOLUME[] PROGMEM
 				"</s:Body>"
 				"</s:Envelope>";
 
-SonosRenderingControl::SonosRenderingControl(IPAddress deviceIP) :
+RenderingControl::RenderingControl(IPAddress deviceIP) :
 		_deviceIP(deviceIP) {
 }
 
-SonosRenderingControl::~SonosRenderingControl() {
+RenderingControl::~RenderingControl() {
 }
 
-bool SonosRenderingControl::GetVolume(SonosGetVolumeCallback callback, uint32_t instanceID, const char *channel) {
+bool RenderingControl::GetVolume(GetVolumeCallback callback, uint32_t instanceID, const char *channel) {
 	size_t size = sizeof(GET_VOLUME) - 2 + 10 - 2 + strlen(channel) + 1;
 	char *buf = (char *) malloc(size);
 	snprintf_P(buf, size, GET_VOLUME, instanceID, channel);
@@ -69,4 +71,6 @@ bool SonosRenderingControl::GetVolume(SonosGetVolumeCallback callback, uint32_t 
 	client.end();
 
 	return result;
+}
+
 }
