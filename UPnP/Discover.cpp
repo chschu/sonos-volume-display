@@ -17,13 +17,20 @@
 
 namespace UPnP {
 
+const char DISCOVER_MSEARCH[] PROGMEM = "M-SEARCH * HTTP/1.1\r\n"
+		"HOST: 239.255.255.250:1900\r\n"
+		"MAN: \"ssdp:discover\"\r\n"
+		"MX: %u\r\n"
+		"ST: %s\r\n"
+		"\r\n";
+
 Discover::Discover() {
 }
 
 Discover::~Discover() {
 }
 
-bool Discover::discover(DiscoverCallback callback, const char *st, int mx, unsigned long timeoutMillis) {
+bool Discover::discover(DiscoverCallback callback, const char *st, uint8_t mx, unsigned long timeoutMillis) {
 	WiFiUDP udp;
 
 	// start UDP connection on a random port
@@ -40,17 +47,15 @@ bool Discover::discover(DiscoverCallback callback, const char *st, int mx, unsig
 		return false;
 	}
 
+	size_t size = sizeof(DISCOVER_MSEARCH) - 2 + String(mx).length() - 2 + strlen(st) + 1;
+	char *buf = (char *) malloc(size);
+	snprintf_P(buf, size, DISCOVER_MSEARCH, mx, st);
+
 	// send the M-SEARCH request packet
-	udp.write("M-SEARCH * HTTP/1.1\r\n");
-	udp.write("HOST: 239.255.255.250:1900\r\n");
-	udp.write("MAN: \"ssdp:discover\"\r\n");
-	udp.write("MX: ");
-	udp.write(String(mx).c_str());
-	udp.write("\r\n");
-	udp.write("ST: ");
-	udp.write(st);
-	udp.write("\r\n");
-	udp.write("\r\n");
+	udp.write(buf);
+
+	free(buf);
+
 	if (!udp.endPacket()) {
 		Serial.println(F("udp.endPacket failed"));
 		udp.stop();
