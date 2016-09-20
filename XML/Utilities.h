@@ -15,7 +15,7 @@
 
 namespace XML {
 
-void replaceEntities(String &s) {
+static void replaceEntities(String &s) {
 	s.replace(F("&lt;"), F("<"));
 	s.replace(F("&gt;"), F(">"));
 	s.replace(F("&apos;"), F("'"));
@@ -24,7 +24,7 @@ void replaceEntities(String &s) {
 	s.replace(F("&amp;"), F("&"));
 }
 
-bool extractEncodedTags(Stream &stream, std::function<bool(String tag)> callback) {
+static bool extractEncodedTags(Stream &stream, std::function<bool(String tag)> callback) {
 	// skip everything up to (and including) the next &lt;
 	while (stream.find("&lt;")) {
 		String tag = "&lt;";
