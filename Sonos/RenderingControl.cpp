@@ -48,25 +48,24 @@ bool RenderingControl::GetVolume(GetVolumeCallback callback, uint32_t instanceID
 
 	free(buf);
 
-	if (status != 200) {
-		Serial.print(F("GetVolume returned HTTP status "));
-		Serial.println(status);
-		return false;
-	}
-
-	WiFiClient stream = client.getStream();
-
 	bool result = false;
-	if (stream.find("<CurrentVolume>")) {
-		// TODO read only until next '<' and check format
-		int volume = stream.parseInt();
-		// must fit into an uint16_t
-		if (volume >= 0 || volume <= 65535) {
-			callback(volume);
-			result = true;
+
+	Serial.print(F("GetVolume returned HTTP status "));
+	Serial.println(status);
+	if (status == 200) {
+		WiFiClient &stream = client.getStream();
+
+		if (stream.find("<CurrentVolume>")) {
+			// TODO read only until next '<' and check format
+			int volume = stream.parseInt();
+			// must fit into an uint16_t
+			if (volume >= 0 || volume <= 65535) {
+				callback(volume);
+				result = true;
+			}
+		} else {
+			Serial.println(F("GetVolume returned an unexpected response"));
 		}
-	} else {
-		Serial.println(F("GetVolume returned an unexpected response"));
 	}
 
 	client.end();
