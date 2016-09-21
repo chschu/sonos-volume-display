@@ -37,7 +37,7 @@ RenderingControl::~RenderingControl() {
 }
 
 bool RenderingControl::GetVolume(GetVolumeCallback callback, uint32_t instanceID, const char *channel) {
-	size_t size = sizeof(GET_VOLUME) - 2 + 10 - 2 + strlen(channel) + 1;
+	size_t size = sizeof(GET_VOLUME) - 2 + String(instanceID).length() - 2 + strlen(channel) + 1;
 	char *buf = (char *) malloc(size);
 	snprintf_P(buf, size, GET_VOLUME, instanceID, channel);
 
