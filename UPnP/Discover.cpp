@@ -10,10 +10,14 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <HardwareSerial.h>
+#include <pgmspace.h>
 #include <Print.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <WiFiUdp.h>
 #include <WString.h>
+#include <cstdint>
+#include <cstring>
 
 namespace UPnP {
 
@@ -47,7 +51,7 @@ bool Discover::discover(DiscoverCallback callback, const char *st, uint8_t mx, u
 		return false;
 	}
 
-	size_t size = sizeof(DISCOVER_MSEARCH) - 2 + String(mx).length() - 2 + strlen(st) + 1;
+	size_t size = sizeof(DISCOVER_MSEARCH) + (3 * sizeof(mx) - 2) + (strlen(st) - 2);
 	char *buf = (char *) malloc(size);
 	snprintf_P(buf, size, DISCOVER_MSEARCH, mx, st);
 
