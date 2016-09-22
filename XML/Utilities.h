@@ -24,9 +24,9 @@ static void replaceEntities(String &s) {
 	s.replace(F("&amp;"), F("&"));
 }
 
-static bool extractEncodedTags(Stream &stream, std::function<bool(String tag)> callback) {
+static bool extractEncodedTags(Stream &stream, const char *terminator, std::function<bool(String tag)> callback) {
 	// skip everything up to (and including) the next &lt;
-	while (stream.find("&lt;")) {
+	while (stream.findUntil("&lt;", terminator)) {
 		String tag = "&lt;";
 
 		// find the next &gt; that ends the encoded tag
