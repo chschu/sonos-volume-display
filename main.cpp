@@ -1,17 +1,19 @@
 #include <Arduino.h>
-#include <ESP8266HTTPClient.h>
+#include <Esp.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiType.h>
 #include <HardwareSerial.h>
 #include <include/wl_definitions.h>
 #include <IPAddress.h>
 #include <WString.h>
+#include <cctype>
+#include <cmath>
 #include <cstdint>
 
 #include "Sonos/Discover.h"
-#include "Sonos/RenderingControl.h"
 #include "Sonos/ZoneGroupTopology.h"
 #include "UPnP/EventServer.h"
+#include "XML/Utilities.h"
 
 #define WIFI_SSID "..."
 #define WIFI_PASS "..."
@@ -45,29 +47,75 @@ void setup() {
 	Sonos::Discover discover;
 	IPAddress addr;
 	if (discover.discoverAny(&addr)) {
-		Serial.println("found a device: " + addr.toString());
+		Serial.print(F("Found a device: "));
+		Serial.println(addr);
 
 		Sonos::ZoneGroupTopology topo(addr);
 		bool discoverResult = topo.GetZoneGroupState_Decoded([](Sonos::ZoneInfo info) {
-			Serial.print(info.uuid);
-			Serial.print(F(": "));
+			Serial.print(F("Discovered: "));
 			Serial.print(info.name);
 			Serial.print(F(" @ "));
-			info.playerIP.printTo(Serial);
-			Serial.println();
+			Serial.println(info.playerIP);
 
-			// TODO handle subscription failure
+			/* TODO handle subscription failure */
+
 			String newSID;
 			eventServer.subscribe([info](String SID, Stream &stream) {
-						/* TODO get from stream! */
-						Sonos::RenderingControl rendering(info.playerIP);
-						rendering.GetVolume([](uint16_t volume) {
-									Serial.print(F("Current volume: "));
-									Serial.println(volume);
-									double x = pow(1024.0, volume/100.0) - 1.0;
-									analogWrite(LED_BUILTIN, 1023-x);
-									active = true;
-									lastWriteMillis = millis();
+						XML::extractEncodedTags(stream, "</LastChange>", [info](String tag) -> bool {
+									if (!tag.startsWith("<Volume ")) {
+										/* continue tag extraction */
+										return true;
+									}
+
+									int channelStart = tag.indexOf(F(" channel=\"")) + 10;
+									if (channelStart < 0) {
+										Serial.println(F("Failed to find start of channel in tag"));
+										return false;
+									}
+									int channelEnd = tag.indexOf('"', channelStart);
+									if (channelEnd < 0) {
+										Serial.println(F("Failed to find end of channel in tag"));
+										return false;
+									}
+									String channel = tag.substring(channelStart, channelEnd);
+
+									int valStart = tag.indexOf(F(" val=\"")) + 6;
+									if (valStart < 0) {
+										Serial.println(F("Failed to find start of val in tag"));
+										return false;
+									}
+									int valEnd = tag.indexOf('"', valStart);
+									if (valEnd < 0) {
+										Serial.println(F("Failed to find end of val in tag"));
+										return false;
+									}
+									String val = tag.substring(valStart, valEnd);
+
+									uint16_t volume = 0;
+									for (const char *p = val.c_str(); *p; p++) {
+										if (isdigit(*p)) {
+											volume = 10 * volume + (*p - '0');
+										} else {
+											Serial.println(F("Found a non-digit in val"));
+											return false;
+										}
+										if (volume > 100) {
+											Serial.println(F("Too large val"));
+											return false;
+										}
+									}
+
+									if (channel == "Master") {
+										Serial.print(info.name);
+										Serial.print(F(": "));
+										Serial.println(volume);
+										double x = pow(1024.0, volume/100.0) - 1.0;
+										analogWrite(LED_BUILTIN, 1023-x);
+										active = true;
+										lastWriteMillis = millis();
+									}
+
+									return true;
 								});
 
 					}, "http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
