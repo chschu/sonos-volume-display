@@ -78,20 +78,12 @@ bool EventServer::unsubscribe(String SID) {
 	return result;
 }
 
-const char NOTIFY_RESPONSE[] PROGMEM = "HTTP/1.1 %u %s\r\n"
-		"Content-Type: %s\r\n"
-		"Content-Length: %u\r\n"
-		"\r\n"
-		"%s";
+const char NOTIFY_RESPONSE[] PROGMEM = "HTTP/1.1 %u %s\r\n\r\n";
 
-static void sendResponse(WiFiClient &client, uint16_t statusCode, String statusText, String content = "",
-		String contentType = "text/plain") {
-	unsigned int contentLength = content.length();
-	size_t size = sizeof(NOTIFY_RESPONSE) + (3 * sizeof(statusCode) - 2) + (statusText.length() - 2)
-			+ (contentType.length() - 2) + (3 * sizeof(contentLength) - 2) + (contentLength - 2);
+static void sendResponse(WiFiClient &client, uint16_t statusCode, String statusText) {
+	size_t size = sizeof(NOTIFY_RESPONSE) + (3 * sizeof(statusCode) - 2) + (statusText.length() - 2);
 	char *buf = (char *) malloc(size);
-	snprintf_P(buf, size, NOTIFY_RESPONSE, statusCode, statusText.c_str(), contentType.c_str(), contentLength,
-			content.c_str());
+	snprintf_P(buf, size, NOTIFY_RESPONSE, statusCode, statusText.c_str());
 
 	client.write((const char *) buf);
 
@@ -105,11 +97,11 @@ static void sendOK(WiFiClient &client) {
 }
 
 static void sendBadRequest(WiFiClient &client) {
-	sendResponse(client, 400, F("Bad Request"), F("400: Bad Request"));
+	sendResponse(client, 400, F("Bad Request"));
 }
 
 static void sendPreconditionFailed(WiFiClient &client) {
-	sendResponse(client, 412, F("Precondition Failed"), F("412: Precondition Failed"));
+	sendResponse(client, 412, F("Precondition Failed"));
 }
 
 void EventServer::handleEvent() {
