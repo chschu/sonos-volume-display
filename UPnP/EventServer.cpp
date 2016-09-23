@@ -163,12 +163,12 @@ void EventServer::handleEvent() {
 			sendBadRequest(client);
 			return;
 		}
-		if (NT != "upnp:event") {
+		if (NT != F("upnp:event")) {
 			Serial.println(F("illegal NT header value"));
 			sendPreconditionFailed(client);
 			return;
 		}
-		if (NTS != "upnp:propchange") {
+		if (NTS != F("upnp:propchange")) {
 			Serial.println(F("illegal NTS header value"));
 			sendPreconditionFailed(client);
 			return;
