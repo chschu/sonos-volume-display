@@ -67,29 +67,17 @@ void setup() {
 										return true;
 									}
 
-									int channelStart = tag.indexOf(F(" channel=\"")) + 10;
-									if (channelStart < 0) {
-										Serial.println(F("Failed to find start of channel in tag"));
+									String channel;
+									if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
+										Serial.println(F("Failed to extract channel attribute from tag"));
 										return false;
-									}
-									int channelEnd = tag.indexOf('"', channelStart);
-									if (channelEnd < 0) {
-										Serial.println(F("Failed to find end of channel in tag"));
-										return false;
-									}
-									String channel = tag.substring(channelStart, channelEnd);
+									};
 
-									int valStart = tag.indexOf(F(" val=\"")) + 6;
-									if (valStart < 0) {
-										Serial.println(F("Failed to find start of val in tag"));
+									String val;
+									if (!XML::extractAttributeValue(tag, F("val"), &val)) {
+										Serial.println(F("Failed to extract val attribute from tag"));
 										return false;
-									}
-									int valEnd = tag.indexOf('"', valStart);
-									if (valEnd < 0) {
-										Serial.println(F("Failed to find end of val in tag"));
-										return false;
-									}
-									String val = tag.substring(valStart, valEnd);
+									};
 
 									uint16_t volume = 0;
 									for (const char *p = val.c_str(); *p; p++) {

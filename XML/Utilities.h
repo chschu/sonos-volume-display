@@ -68,6 +68,24 @@ static bool extractEncodedTags(Stream &stream, const char *terminator, std::func
 	return true;
 }
 
+static bool extractAttributeValue(String tag, String attributeName, String *attributeValue) {
+	int attributeStart = tag.indexOf(' ' + attributeName + "=\"");
+	if (attributeStart < 0) {
+		Serial.println(F("Failed to find start of attribute"));
+		return false;
+	}
+	int valueStart = attributeStart + attributeName.length() + 3;
+	int valueEnd = tag.indexOf('"', valueStart);
+	if (valueEnd < 0) {
+		Serial.println(F("Failed to find end of attribute"));
+		return false;
+	}
+	String value = tag.substring(valueStart, valueEnd);
+	replaceEntities(value);
+	*attributeValue = value;
+	return true;
+}
+
 }
 
 #endif /* XML_UTILITIES_H_ */
