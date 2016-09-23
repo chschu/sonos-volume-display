@@ -101,15 +101,15 @@ static void sendResponse(WiFiClient &client, uint16_t statusCode, String statusT
 }
 
 static void sendOK(WiFiClient &client) {
-	sendResponse(client, 200, "OK");
+	sendResponse(client, 200, F("OK"));
 }
 
 static void sendBadRequest(WiFiClient &client) {
-	sendResponse(client, 400, "Bad Request", "400: Bad Request");
+	sendResponse(client, 400, F("Bad Request"), F("400: Bad Request"));
 }
 
 static void sendPreconditionFailed(WiFiClient &client) {
-	sendResponse(client, 412, "Precondition Failed", "412: Precondition Failed");
+	sendResponse(client, 412, F("Precondition Failed"), F("412: Precondition Failed"));
 }
 
 void EventServer::handleEvent() {
