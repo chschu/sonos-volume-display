@@ -7,6 +7,7 @@
 
 #include "EventServer.h"
 
+#include <Arduino.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <HardwareSerial.h>
@@ -26,16 +27,25 @@ EventServer::EventServer(uint16_t callbackPort) :
 EventServer::~EventServer() {
 }
 
-bool EventServer::subscribe(EventCallback callback, String subscriptionURL, String *SID) {
+static unsigned int extractTimeoutSeconds(String timeoutResponseHeaderValue, unsigned int defaultValue) {
+	if (timeoutResponseHeaderValue.startsWith("Second-")) {
+		return atoi(timeoutResponseHeaderValue.c_str() + 7);
+	}
+	Serial.println(F("received TIMEOUT header without prefix; using default value"));
+	return defaultValue;
+}
+
+bool EventServer::subscribe(EventCallback callback, String subscriptionURL, String *SID, unsigned int timeoutSeconds,
+		double renewalThreshold) {
 	bool result = false;
 	HTTPClient http;
 	if (http.begin(subscriptionURL)) {
-		http.addHeader("NT", "upnp:event");
-		http.addHeader("Callback", "<http://" + WiFi.localIP().toString() + ":" + String(_callbackPort) + ">");
-		http.addHeader("Content-Length", "0");
-		// TODO add TIMEOUT header ("Second-12345")
-		const char *headerKeys[] = { "SID" };
-		http.collectHeaders(headerKeys, 1);
+		http.addHeader(F("NT"), F("upnp:event"));
+		http.addHeader(F("CALLBACK"),
+				String(F("<http://")) + WiFi.localIP().toString() + ':' + String(_callbackPort) + '>');
+		http.addHeader(F("TIMEOUT"), String(F("Second-")) + String(timeoutSeconds));
+		const char *headerKeys[] = { "SID", "TIMEOUT" };
+		http.collectHeaders(headerKeys, 2);
 		int status = http.sendRequest("SUBSCRIBE");
 		Serial.print(F("EventServer::subscribe() -> status "));
 		Serial.println(status);
@@ -44,13 +54,66 @@ bool EventServer::subscribe(EventCallback callback, String subscriptionURL, Stri
 			if (newSID != "") {
 				// check map for existing SID
 				if (_subscriptionForSID.find(newSID) == _subscriptionForSID.end()) {
+					unsigned int actualTimeoutSeconds = extractTimeoutSeconds(http.header("TIMEOUT"), timeoutSeconds);
+					// populate subscription
+					_Subscription sub;
+					sub._callback = callback;
+					sub._subscriptionURL = subscriptionURL;
+					sub._startMillis = millis();
+					sub._renewalAfterMillis = renewalThreshold * 1000.0 * actualTimeoutSeconds;
+					sub._timeoutSeconds = timeoutSeconds;
+					sub._renewalThreshold = renewalThreshold;
 					// insert subscription into map
-					_subscriptionForSID[newSID] = {callback, subscriptionURL};
-					// return SID via parameter
-					*SID = newSID;
+					_subscriptionForSID[newSID] = sub;
+					if (SID) {
+						*SID = newSID;
+					}
 					result = true;
 				}
+			} else {
+				Serial.println(F("missing SID header value"));
 			}
+		}
+		http.end();
+	}
+	return result;
+}
+
+bool EventServer::renew(String SID) {
+	auto subIt = _subscriptionForSID.find(SID);
+	if (subIt == _subscriptionForSID.end()) {
+		Serial.println(F("unable to renew an unknown subscription"));
+		return false;
+	}
+	return _renew(subIt);
+}
+
+bool EventServer::_renew(std::map<String, _Subscription>::iterator subIt) {
+	bool result = false;
+	String SID = subIt->first;
+	_Subscription &sub = subIt->second;
+	Serial.print(F("renewing subscription for SID "));
+	Serial.println(SID);
+	HTTPClient http;
+	if (http.begin(sub._subscriptionURL)) {
+		http.addHeader(F("SID"), SID);
+		http.addHeader(F("TIMEOUT"), String(F("Second-")) + String(sub._timeoutSeconds));
+		const char *headerKeys[] = { "TIMEOUT" };
+		http.collectHeaders(headerKeys, 1);
+		int status = http.sendRequest("SUBSCRIBE");
+		Serial.print(F("renew subscription -> status "));
+		Serial.println(status);
+		if (status == 200) {
+			unsigned int actualTimeoutSeconds = extractTimeoutSeconds(http.header("TIMEOUT"), sub._timeoutSeconds);
+			// update subscription entry
+			sub._startMillis = millis();
+			sub._renewalAfterMillis = sub._renewalThreshold * 1000.0 * actualTimeoutSeconds;
+			result = true;
+		} else {
+			// renewal failed, mark for removal
+			// TODO add notification callback for this case
+			Serial.println(F("removing subscription after failed renewal"));
+			result = true;
 		}
 		http.end();
 	}
@@ -63,8 +126,7 @@ bool EventServer::unsubscribe(String SID) {
 	if (sub != _subscriptionForSID.end()) {
 		HTTPClient http;
 		if (http.begin(sub->second._subscriptionURL)) {
-			http.addHeader("SID", SID);
-			http.addHeader("Content-Length", "0");
+			http.addHeader(F("SID"), SID);
 			int status = http.sendRequest("UNSUBSCRIBE");
 			Serial.println(F("EventServer::unsubscribe() -> status "));
 			Serial.println(status);
@@ -184,6 +246,19 @@ void EventServer::handleEvent() {
 		Serial.println(SID);
 		sub->second._callback(SID, client);
 		sendOK(client);
+	}
+
+	// renew all subscriptions whose _renewalAfterMillis has elapsed
+	for (auto it = _subscriptionForSID.begin(); it != _subscriptionForSID.end();) {
+		_Subscription &sub = it->second;
+		// if renewal is required and it fails, remove the subscription
+		if (millis() - sub._startMillis >= sub._renewalAfterMillis && !_renew(it)) {
+			Serial.print(F("removing subscription after failed renewal for SID "));
+			Serial.println(it->first);
+			it = _subscriptionForSID.erase(it);
+		} else {
+			++it;
+		}
 	}
 }
 
