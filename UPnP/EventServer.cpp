@@ -59,7 +59,7 @@ bool EventServer::subscribe(EventCallback callback, String subscriptionURL, Stri
 
 bool EventServer::unsubscribe(String SID) {
 	bool result = false;
-	std::map<String, _Subscription>::iterator sub = _subscriptionForSID.find(SID);
+	auto sub = _subscriptionForSID.find(SID);
 	if (sub != _subscriptionForSID.end()) {
 		HTTPClient http;
 		if (http.begin(sub->second._subscriptionURL)) {
@@ -173,7 +173,7 @@ void EventServer::handleEvent() {
 			sendPreconditionFailed(client);
 			return;
 		}
-		std::map<String, _Subscription>::iterator sub = _subscriptionForSID.find(SID);
+		auto sub = _subscriptionForSID.find(SID);
 		if (sub == _subscriptionForSID.end()) {
 			Serial.println(F("unexpected SID header value"));
 			sendPreconditionFailed(client);
