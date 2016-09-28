@@ -103,6 +103,7 @@ void setup() {
 										Serial.println(volume);
 										double x = pow(1024.0, volume/100.0) - 1.0;
 										analogWrite(LED_BUILTIN, 1023-x);
+										analogWrite(D1, x);
 										active = true;
 										lastWriteMillis = millis();
 									}
@@ -125,6 +126,7 @@ void loop() {
 	webServer.handleClient();
 	if (active && millis() - lastWriteMillis > 2000) {
 		analogWrite(LED_BUILTIN, 1023);
+		analogWrite(D1, 0);
 		active = false;
 	}
 }
