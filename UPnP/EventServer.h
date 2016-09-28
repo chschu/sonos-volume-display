@@ -8,6 +8,8 @@
 #ifndef UPNP_EVENTSERVER_H_
 #define UPNP_EVENTSERVER_H_
 
+#include <IPAddress.h>
+#include <stddef.h>
 #include <Stream.h>
 #include <WiFiServer.h>
 #include <WString.h>
@@ -21,6 +23,7 @@ typedef std::function<void(String SID, Stream &stream)> EventCallback;
 
 class EventServer: public WiFiServer {
 public:
+	EventServer(IPAddress addr, uint16_t callbackPort);
 	EventServer(uint16_t callbackPort);
 	~EventServer();
 

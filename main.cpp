@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Esp.h>
+#include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiType.h>
 #include <HardwareSerial.h>
@@ -19,6 +20,7 @@
 #define WIFI_PASS "..."
 
 UPnP::EventServer eventServer(1400);
+ESP8266WebServer webServer;
 
 bool active = false;
 unsigned long lastWriteMillis = 0;
@@ -30,7 +32,8 @@ void setup() {
 	pinMode(LED_BUILTIN, OUTPUT);
 	digitalWrite(LED_BUILTIN, HIGH);
 
-	WiFi.mode(WIFI_STA);
+	WiFi.mode(WIFI_AP_STA);
+	WiFi.softAP((String("SVD-") + String(ESP.getChipId(), 16)).c_str(), "q1w2e3r4");
 	Serial.print(F("Connecting to WiFi."));
 	WiFi.begin(WIFI_SSID, WIFI_PASS);
 	while (WiFi.status() != WL_CONNECTED) {
@@ -42,6 +45,7 @@ void setup() {
 	Serial.println(WiFi.SSID());
 	Serial.println(WiFi.macAddress());
 
+	eventServer = UPnP::EventServer(WiFi.localIP(), 1400);
 	eventServer.begin();
 
 	Sonos::Discover discover;
@@ -118,6 +122,7 @@ void setup() {
 
 void loop() {
 	eventServer.handleEvent();
+	webServer.handleClient();
 	if (active && millis() - lastWriteMillis > 2000) {
 		analogWrite(LED_BUILTIN, 1023);
 		active = false;

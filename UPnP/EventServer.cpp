@@ -11,14 +11,16 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <HardwareSerial.h>
-#include <IPAddress.h>
 #include <pgmspace.h>
 #include <Print.h>
-#include <stddef.h>
 #include <stdlib.h>
 #include <WiFiClient.h>
 
 namespace UPnP {
+
+EventServer::EventServer(IPAddress addr, uint16_t callbackPort) :
+		WiFiServer(addr, callbackPort), _callbackPort(callbackPort) {
+}
 
 EventServer::EventServer(uint16_t callbackPort) :
 		WiFiServer(callbackPort), _callbackPort(callbackPort) {
