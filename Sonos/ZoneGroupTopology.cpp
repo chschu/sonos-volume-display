@@ -47,7 +47,7 @@ bool ZoneGroupTopology::GetZoneGroupState_Decoded(ZoneInfoCallback callback, boo
 			// the response is an XML-encoded XML string wrapped in a <ZoneGroupState> tag and some SOAP
 			// extract the encoded tags by matching &lt; and &gt;
 
-			bool result = XML::extractEncodedTags(client.getStream(), "</ZoneGroupState>",
+			result = XML::extractEncodedTags(client.getStream(), "</ZoneGroupState>",
 					[callback, visibleOnly](String tag) -> bool {
 						if (!tag.startsWith(F("<Satellite ")) && !tag.startsWith(F("<ZoneGroupMember "))) {
 							/* continue tag extraction */
@@ -100,8 +100,8 @@ bool ZoneGroupTopology::GetZoneGroupState_Decoded(ZoneInfoCallback callback, boo
 
 		client.end();
 	}
-	return result;
 
+	return result;
 }
 
 }
