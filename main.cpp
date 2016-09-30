@@ -6,6 +6,7 @@
 #include <HardwareSerial.h>
 #include <include/wl_definitions.h>
 #include <IPAddress.h>
+#include <pins_arduino.h>
 #include <WString.h>
 #include <cctype>
 #include <cmath>
@@ -19,8 +20,8 @@
 #define WIFI_SSID "..."
 #define WIFI_PASS "..."
 
-UPnP::EventServer eventServer;
-ESP8266WebServer webServer;
+UPnP::EventServer *eventServer;
+ESP8266WebServer *webServer;
 
 bool active = false;
 unsigned long lastWriteMillis = 0;
@@ -45,8 +46,11 @@ void setup() {
 	Serial.println(WiFi.SSID());
 	Serial.println(WiFi.macAddress());
 
-	eventServer = UPnP::EventServer(WiFi.localIP());
-	eventServer.begin();
+	eventServer = new UPnP::EventServer(WiFi.localIP());
+	eventServer->begin();
+
+	webServer = new ESP8266WebServer();
+	webServer->begin();
 
 	Sonos::Discover discover;
 	IPAddress addr;
@@ -64,7 +68,7 @@ void setup() {
 			/* TODO handle subscription failure */
 
 			String newSID;
-			eventServer.subscribe([info](String SID, Stream &stream) {
+			eventServer->subscribe([info](String SID, Stream &stream) {
 						XML::extractEncodedTags(stream, "</LastChange>", [info](String tag) -> bool {
 									if (!tag.startsWith("<Volume ")) {
 										/* continue tag extraction */
@@ -122,8 +126,8 @@ void setup() {
 }
 
 void loop() {
-	eventServer.handleEvent();
-	webServer.handleClient();
+	eventServer->handleEvent();
+	webServer->handleClient();
 	if (active && millis() - lastWriteMillis > 2000) {
 		analogWrite(LED_BUILTIN, 1023);
 		analogWrite(D1, 0);
