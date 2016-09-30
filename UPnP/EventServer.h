@@ -23,8 +23,8 @@ typedef std::function<void(String SID, Stream &stream)> EventCallback;
 
 class EventServer: public WiFiServer {
 public:
-	EventServer(IPAddress addr, uint16_t callbackPort);
-	EventServer(uint16_t callbackPort);
+	EventServer(IPAddress addr, uint16_t callbackPort = 1400);
+	EventServer(uint16_t callbackPort = 1400);
 	~EventServer();
 
 	// subscribe to an event at the endpoint defined via subscriptionURL

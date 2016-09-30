@@ -19,7 +19,7 @@
 #define WIFI_SSID "..."
 #define WIFI_PASS "..."
 
-UPnP::EventServer eventServer(1400);
+UPnP::EventServer eventServer;
 ESP8266WebServer webServer;
 
 bool active = false;
@@ -45,7 +45,7 @@ void setup() {
 	Serial.println(WiFi.SSID());
 	Serial.println(WiFi.macAddress());
 
-	eventServer = UPnP::EventServer(WiFi.localIP(), 1400);
+	eventServer = UPnP::EventServer(WiFi.localIP());
 	eventServer.begin();
 
 	Sonos::Discover discover;
