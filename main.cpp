@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <Esp.h>
-#include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiType.h>
 #include <HardwareSerial.h>
@@ -12,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 
+#include "ConfigServer.h"
 #include "Sonos/Discover.h"
 #include "Sonos/ZoneGroupTopology.h"
 #include "UPnP/EventServer.h"
@@ -21,7 +21,7 @@
 #define WIFI_PASS "..."
 
 UPnP::EventServer *eventServer;
-ESP8266WebServer *webServer;
+ConfigServer *configServer;
 
 bool active = false;
 unsigned long lastWriteMillis = 0;
@@ -49,8 +49,8 @@ void setup() {
 	eventServer = new UPnP::EventServer(WiFi.localIP());
 	eventServer->begin();
 
-	webServer = new ESP8266WebServer();
-	webServer->begin();
+	configServer = new ConfigServer();
+	configServer->begin();
 
 	Sonos::Discover discover;
 	IPAddress addr;
@@ -127,7 +127,7 @@ void setup() {
 
 void loop() {
 	eventServer->handleEvent();
-	webServer->handleClient();
+	configServer->handleClient();
 	if (active && millis() - lastWriteMillis > 2000) {
 		analogWrite(LED_BUILTIN, 1023);
 		analogWrite(D1, 0);
