@@ -9,10 +9,10 @@
 
 #include <ESP8266WiFi.h>
 #include <include/wl_definitions.h>
-#include <pgmspace.h>
 #include <WString.h>
 #include <functional>
 
+#include "JSON/Builder.h"
 #include "Sonos/Discover.h"
 #include "Sonos/ZoneGroupTopology.h"
 
@@ -41,64 +41,22 @@ void ConfigServer::stop() {
 	_server.stop();
 }
 
-static String jsonEscape(const String &value) {
-	String escaped;
-	for (const char *p = value.c_str(); *p; p++) {
-		switch (*p) {
-		case '"':
-		case '\\':
-		case '/':
-			escaped += '\\';
-			escaped += *p;
-			break;
-		case '\b':
-			escaped += "\\b";
-			break;
-		case '\t':
-			escaped += "\\t";
-			break;
-		case '\n':
-			escaped += "\\n";
-			break;
-		case '\f':
-			escaped += "\\f";
-			break;
-		case '\r':
-			escaped += "\\r";
-			break;
-		default:
-			if (*p < ' ') {
-				char buf[7];
-				snprintf_P(buf, sizeof(buf), PSTR("\\u%04X"), *p);
-				escaped += buf;
-			} else {
-				escaped += *p;
-			}
-		}
-	}
-	return escaped;
-}
-
 void ConfigServer::_handleGetApiNetwork() {
 	int8_t n = WiFi.scanNetworks();
 
 	if (n >= 0) {
-		String json('[');
+		JSON::Builder json;
+		json.beginArray();
 		for (uint8_t i = 0; i < n; i++) {
-			if (i > 0) {
-				json += ',';
-			}
-			json += F("{\"ssid\":\"");
-			json += WiFi.ESP8266WiFiScanClass::SSID(i);
-			json += F("\",\"rssi\":");
-			json += WiFi.ESP8266WiFiScanClass::RSSI(i);
-			json += F(",\"encrypted\":");
-			json += WiFi.encryptionType(i) != ENC_TYPE_NONE ? "true" : "false";
-			json += F("}");
+			json.beginObject();
+			json.attribute(F("ssid"), WiFi.ESP8266WiFiScanClass::SSID(i));
+			json.attribute(F("rssi"), WiFi.ESP8266WiFiScanClass::RSSI(i));
+			json.attribute(F("encrypted"), WiFi.encryptionType(i) != ENC_TYPE_NONE);
+			json.endObject();
 		}
-		json += F("]");
+		json.endArray();
 
-		_server.send(200, F("application/json; charset=utf-8"), json);
+		_server.send(200, F("application/json; charset=utf-8"), json.toString());
 	} else {
 		_server.send(500, F("text/plain"), F("Network Scan Failed"));
 	}
@@ -111,23 +69,19 @@ void ConfigServer::_handleGetApiDiscover() {
 	if (Sonos::Discover().discoverAny(&addr)) {
 		Sonos::ZoneGroupTopology topo(addr);
 
-		String json('[');
+		JSON::Builder json;
+		json.beginArray();
 		bool discoverResult = topo.GetZoneGroupState_Decoded([&json](Sonos::ZoneInfo info) {
-			if (json.length() > 1) {
-				json += ',';
-			}
-			json += F("{\"uuid\":\"");
-			json += jsonEscape(info.uuid);
-			json += F("\",\"name\":\"");
-			json += jsonEscape(info.name);
-			json += F("\",\"ip\":\"");
-			json += info.playerIP.toString();
-			json += F("\"}");
+			json.beginObject();
+			json.attribute(F("uuid"), info.uuid);
+			json.attribute(F("name"), info.name);
+			json.attribute(F("ip"), info.playerIP.toString());
+			json.endObject();
 		});
-		json += F("]");
+		json.endArray();
 
 		if (discoverResult) {
-			_server.send(200, F("application/json; charset=utf-8"), json);
+			_server.send(200, F("application/json; charset=utf-8"), json.toString());
 		} else {
 			_server.send(500, F("text/plain"), F("Error Decoding Discovery Response"));
 		}
