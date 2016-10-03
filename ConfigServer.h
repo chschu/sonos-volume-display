@@ -25,6 +25,7 @@ public:
 private:
 	ESP8266WebServer _server;
 
+	void _handleGetApiNetwork();
 	void _handleGetApiDiscover();
 };
 

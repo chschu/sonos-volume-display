@@ -7,6 +7,8 @@
 
 #include "ConfigServer.h"
 
+#include <ESP8266WiFi.h>
+#include <include/wl_definitions.h>
 #include <pgmspace.h>
 #include <WString.h>
 #include <functional>
@@ -26,6 +28,7 @@ ConfigServer::~ConfigServer() {
 }
 
 void ConfigServer::begin() {
+	_server.on("/api/network", HTTP_GET, std::bind(&ConfigServer::_handleGetApiNetwork, this));
 	_server.on("/api/discover", HTTP_GET, std::bind(&ConfigServer::_handleGetApiDiscover, this));
 	_server.begin();
 }
@@ -74,6 +77,33 @@ static String jsonEscape(const String &value) {
 		}
 	}
 	return escaped;
+}
+
+void ConfigServer::_handleGetApiNetwork() {
+	int8_t n = WiFi.scanNetworks();
+
+	if (n >= 0) {
+		String json('[');
+		for (uint8_t i = 0; i < n; i++) {
+			if (i > 0) {
+				json += ',';
+			}
+			json += F("{\"ssid\":\"");
+			json += WiFi.ESP8266WiFiScanClass::SSID(i);
+			json += F("\",\"rssi\":");
+			json += WiFi.ESP8266WiFiScanClass::RSSI(i);
+			json += F(",\"encrypted\":");
+			json += WiFi.encryptionType(i) != ENC_TYPE_NONE ? "true" : "false";
+			json += F("}");
+		}
+		json += F("]");
+
+		_server.send(200, F("application/json; charset=utf-8"), json);
+	} else {
+		_server.send(500, F("text/plain"), F("Network Scan Failed"));
+	}
+
+	WiFi.scanDelete();
 }
 
 void ConfigServer::_handleGetApiDiscover() {
