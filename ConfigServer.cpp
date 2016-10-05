@@ -8,8 +8,8 @@
 #include "ConfigServer.h"
 
 #include <ESP8266WiFi.h>
+#include <HardwareSerial.h>
 #include <include/wl_definitions.h>
-#include <WString.h>
 #include <functional>
 
 #include "JSON/Builder.h"
@@ -29,6 +29,7 @@ ConfigServer::~ConfigServer() {
 
 void ConfigServer::begin() {
 	_server.on("/api/network", HTTP_GET, std::bind(&ConfigServer::_handleGetApiNetwork, this));
+	_server.on("/api/network", HTTP_POST, std::bind(&ConfigServer::_handlePostApiNetwork, this));
 	_server.on("/api/discover", HTTP_GET, std::bind(&ConfigServer::_handleGetApiDiscover, this));
 	_server.begin();
 }
@@ -62,6 +63,39 @@ void ConfigServer::_handleGetApiNetwork() {
 	}
 
 	WiFi.scanDelete();
+}
+
+bool ConfigServer::needsReconnect() {
+	return _reconnectSSID.length();
+}
+
+String ConfigServer::reconnectSSID() {
+	return _reconnectSSID;
+}
+
+String ConfigServer::reconnectPassphrase() {
+	return _reconnectPassphrase;
+}
+
+void ConfigServer::reconnectDone() {
+	_reconnectSSID = _reconnectPassphrase = "";
+}
+
+void ConfigServer::_handlePostApiNetwork() {
+	String plain = _server.arg(F("plain"));
+	Serial.println(plain);
+	String ssid = _server.arg(F("ssid"));
+	String pass = _server.arg(F("pass"));
+	Serial.printf("got ssid = %s, pass = %s\r\n", ssid.c_str(), pass.c_str());
+	if (ssid.length() && pass.length()) {
+		_reconnectSSID = ssid;
+		_reconnectPassphrase = pass;
+		JSON::Builder json;
+		json.value(F("OK"));
+		_server.send(201, F("application/json; charset=utf-8"), json.toString());
+	} else {
+		_server.send(400, F("text/plain"), F("Missing Request Argument"));
+	}
 }
 
 void ConfigServer::_handleGetApiDiscover() {

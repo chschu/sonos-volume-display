@@ -3,9 +3,9 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiType.h>
 #include <HardwareSerial.h>
-#include <include/wl_definitions.h>
 #include <IPAddress.h>
 #include <pins_arduino.h>
+#include <stddef.h>
 #include <WString.h>
 #include <cctype>
 #include <cmath>
@@ -17,11 +17,8 @@
 #include "UPnP/EventServer.h"
 #include "XML/Utilities.h"
 
-#define WIFI_SSID "..."
-#define WIFI_PASS "..."
-
-UPnP::EventServer *eventServer;
-ConfigServer *configServer;
+UPnP::EventServer *eventServer = NULL;
+ConfigServer *configServer = NULL;
 
 bool active = false;
 unsigned long lastWriteMillis = 0;
@@ -29,28 +26,32 @@ unsigned long lastWriteMillis = 0;
 void setup() {
 	Serial.begin(115200);
 	delay(500);
+	Serial.println();
+	Serial.println();
+	Serial.println();
+	Serial.println();
+	Serial.println();
+	Serial.println();
 
 	pinMode(LED_BUILTIN, OUTPUT);
 	digitalWrite(LED_BUILTIN, HIGH);
 
 	WiFi.mode(WIFI_AP_STA);
 	WiFi.softAP((String("SVD-") + String(ESP.getChipId(), 16)).c_str(), "q1w2e3r4");
-	Serial.print(F("Connecting to WiFi."));
-	WiFi.begin(WIFI_SSID, WIFI_PASS);
-	while (WiFi.status() != WL_CONNECTED) {
-		delay(1000);
-		Serial.print('.');
-	}
-	Serial.println(F(" OK!"));
-	Serial.println(WiFi.localIP());
-	Serial.println(WiFi.SSID());
-	Serial.println(WiFi.macAddress());
-
-	eventServer = new UPnP::EventServer(WiFi.localIP());
-	eventServer->begin();
+	WiFi.setAutoConnect(true);
+	WiFi.setAutoReconnect(true);
+	WiFi.begin();
 
 	configServer = new ConfigServer();
 	configServer->begin();
+}
+
+void initializeEventServer() {
+	Serial.println(WiFi.localIP());
+	Serial.println(WiFi.SSID());
+	Serial.println(WiFi.macAddress());
+	eventServer = new UPnP::EventServer(WiFi.localIP());
+	eventServer->begin();
 
 	Sonos::Discover discover;
 	IPAddress addr;
@@ -121,16 +122,43 @@ void setup() {
 			Serial.println(newSID);
 		});
 	}
-	Serial.print(F("Free heap after setup: "));
-	Serial.println(ESP.getFreeHeap());
+}
+
+void destroyEventServer() {
+	if (eventServer) {
+		// TODO unsubscribe all SIDs
+		eventServer->stop();
+		delete eventServer;
+		eventServer = NULL;
+	}
 }
 
 void loop() {
-	eventServer->handleEvent();
+	if (eventServer) {
+		eventServer->handleEvent();
+	}
 	configServer->handleClient();
+
 	if (active && millis() - lastWriteMillis > 2000) {
 		analogWrite(LED_BUILTIN, 1023);
 		analogWrite(D1, 0);
 		active = false;
+	}
+
+	if (configServer->needsReconnect()) {
+		Serial.println("reconnecting with new WiFi");
+		destroyEventServer();
+		WiFi.disconnect();
+		// TODO continue looping
+		delay(1000);
+		String ssid = configServer->reconnectSSID();
+		String pass = configServer->reconnectPassphrase();
+		WiFi.begin(ssid.c_str(), pass.c_str());
+		configServer->reconnectDone();
+	}
+
+	if (WiFi.isConnected() && !eventServer) {
+		Serial.println("connected with new WiFi");
+		initializeEventServer();
 	}
 }
