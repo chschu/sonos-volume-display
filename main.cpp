@@ -126,18 +126,20 @@ void setup() {
 
 	// show startup animation
 	for (int i = 0; i <= 100; i++) {
-		delay(2);
 		showVolume(gradient, i / 100.0, i / 100.0);
+		delay(2);
 	}
+	delay(498);
 	for (int i = 0; i < 4; i++) {
-		delay(200);
 		showVolume(gradient, 0.0, 0.0);
 		delay(200);
 		showVolume(gradient, 1.0, 1.0);
+		delay(200);
 	}
+	delay(300);
 	for (int i = 99; i >= 0; i--) {
-		delay(2);
 		showVolume(gradient, i / 100.0, i / 100.0);
+		delay(2);
 	}
 
 	// start web server for configuration
