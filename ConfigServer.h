@@ -32,7 +32,8 @@ private:
 	ESP8266WebServer _server;
 
 	void _handleGetApiNetwork();
-	void _handlePostApiNetwork();
+	void _handleGetApiNetworkCurrent();
+	void _handlePostApiNetworkCurrent();
 	void _handleGetApiDiscover();
 
 	String _reconnectSSID;

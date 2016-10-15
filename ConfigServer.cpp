@@ -29,8 +29,9 @@ ConfigServer::~ConfigServer() {
 
 void ConfigServer::begin() {
 	_server.on("/api/network", HTTP_GET, std::bind(&ConfigServer::_handleGetApiNetwork, this));
-	_server.on("/api/network", HTTP_POST, std::bind(&ConfigServer::_handlePostApiNetwork, this));
-	_server.on("/api/discover", HTTP_GET, std::bind(&ConfigServer::_handleGetApiDiscover, this));
+	_server.on("/api/network/current", HTTP_GET, std::bind(&ConfigServer::_handleGetApiNetworkCurrent, this));
+	_server.on("/api/network/current", HTTP_POST, std::bind(&ConfigServer::_handlePostApiNetworkCurrent, this));
+	_server.on("/api/room", HTTP_GET, std::bind(&ConfigServer::_handleGetApiDiscover, this));
 	_server.begin();
 }
 
@@ -82,7 +83,23 @@ void ConfigServer::reconnectDone() {
 	_reconnectSSID = _reconnectPassphrase = "";
 }
 
-void ConfigServer::_handlePostApiNetwork() {
+void ConfigServer::_handleGetApiNetworkCurrent() {
+	JSON::Builder json;
+	json.beginObject();
+	String status;
+	if (WiFi.isConnected()) {
+		json.attribute(F("connected"), true);
+		json.attribute(F("ssid"), WiFi.SSID());
+		json.attribute(F("bssid"), WiFi.BSSIDstr());
+		json.attribute(F("rssi"), WiFi.RSSI());
+	} else {
+		json.attribute(F("connected"), false);
+	}
+	json.endObject();
+	_server.send(200, F("application/json; charset=utf-8"), json.toString());
+}
+
+void ConfigServer::_handlePostApiNetworkCurrent() {
 	String plain = _server.arg(F("plain"));
 	Serial.println(plain);
 	String ssid = _server.arg(F("ssid"));
