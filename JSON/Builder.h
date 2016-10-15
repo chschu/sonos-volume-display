@@ -31,6 +31,7 @@ public:
 	void value(int x);
 	void value(bool x);
 	void value(const String &x);
+	void value(const __FlashStringHelper *x);
 
 	// append a separator (',') if required, and append a JSON attribute without value
 	// this can be used to construct attributes with arbitrarily typed values

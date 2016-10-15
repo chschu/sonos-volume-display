@@ -55,6 +55,11 @@ void Builder::value(bool x) {
 	_json += x ? F("true") : F("false");
 }
 
+void Builder::value(const __FlashStringHelper *x) {
+	_separator();
+	_quoted(x);
+}
+
 void Builder::value(const String &x) {
 	_separator();
 	_quoted(x);
