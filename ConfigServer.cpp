@@ -51,6 +51,7 @@ void ConfigServer::_handleGetApiNetwork() {
 		for (uint8_t i = 0; i < n; i++) {
 			json.beginObject();
 			json.attribute(F("ssid"), WiFi.ESP8266WiFiScanClass::SSID(i));
+			json.attribute(F("bssid"), WiFi.ESP8266WiFiScanClass::BSSIDstr(i));
 			json.attribute(F("rssi"), WiFi.ESP8266WiFiScanClass::RSSI(i));
 			json.attribute(F("encrypted"), WiFi.encryptionType(i) != ENC_TYPE_NONE);
 			json.endObject();
