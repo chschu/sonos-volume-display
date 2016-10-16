@@ -10,7 +10,7 @@
 #include <ESP8266WiFi.h>
 #include <HardwareSerial.h>
 #include <include/wl_definitions.h>
-#include <functional>
+#include <WString.h>
 
 #include "JSON/Builder.h"
 #include "Sonos/Discover.h"
@@ -43,6 +43,10 @@ void ConfigServer::stop() {
 	_server.stop();
 }
 
+void ConfigServer::onBeforeNetworkChange(ConfigServerBeforeNetworkChangeCallback callback) {
+	_beforeNetworkChangeCallback = callback;
+}
+
 void ConfigServer::_handleGetApiNetwork() {
 	int8_t n = WiFi.scanNetworks();
 
@@ -67,22 +71,6 @@ void ConfigServer::_handleGetApiNetwork() {
 	WiFi.scanDelete();
 }
 
-bool ConfigServer::needsReconnect() {
-	return _reconnectSSID.length();
-}
-
-String ConfigServer::reconnectSSID() {
-	return _reconnectSSID;
-}
-
-String ConfigServer::reconnectPassphrase() {
-	return _reconnectPassphrase;
-}
-
-void ConfigServer::reconnectDone() {
-	_reconnectSSID = _reconnectPassphrase = "";
-}
-
 void ConfigServer::_handleGetApiNetworkCurrent() {
 	JSON::Builder json;
 	json.beginObject();
@@ -103,14 +91,18 @@ void ConfigServer::_handlePostApiNetworkCurrent() {
 	String plain = _server.arg(F("plain"));
 	Serial.println(plain);
 	String ssid = _server.arg(F("ssid"));
-	String pass = _server.arg(F("pass"));
-	Serial.printf("got ssid = %s, pass = %s\r\n", ssid.c_str(), pass.c_str());
-	if (ssid.length() && pass.length()) {
-		_reconnectSSID = ssid;
-		_reconnectPassphrase = pass;
+	String passphrase = _server.arg(F("passphrase"));
+	Serial.printf("got ssid = \"%s\", passphrase = \"%s\"\r\n", ssid.c_str(), passphrase.c_str());
+	if (ssid.length() && passphrase.length()) {
 		JSON::Builder json;
 		json.value(F("OK"));
 		_server.send(201, F("application/json; charset=utf-8"), json.toString());
+
+		_beforeNetworkChangeCallback();
+
+		// reconnect with new SSID and passphrase
+		WiFi.disconnect();
+		WiFi.begin(ssid.c_str(), passphrase.c_str());
 	} else {
 		_server.send(400, F("text/plain"), F("Missing Request Argument"));
 	}

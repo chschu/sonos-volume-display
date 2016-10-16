@@ -10,8 +10,10 @@
 
 #include <ESP8266WebServer.h>
 #include <IPAddress.h>
-#include <WString.h>
 #include <cstdint>
+#include <functional>
+
+typedef std::function<void()> ConfigServerBeforeNetworkChangeCallback;
 
 class ConfigServer {
 public:
@@ -23,21 +25,17 @@ public:
 	void handleClient();
 	void stop();
 
-	bool needsReconnect();
-	String reconnectSSID();
-	String reconnectPassphrase();
-	void reconnectDone();
+	// set the callback for cleanup before reconnecting to a new WiFi network
+	void onBeforeNetworkChange(ConfigServerBeforeNetworkChangeCallback callback);
 
 private:
 	ESP8266WebServer _server;
+	ConfigServerBeforeNetworkChangeCallback _beforeNetworkChangeCallback;
 
 	void _handleGetApiNetwork();
 	void _handleGetApiNetworkCurrent();
 	void _handlePostApiNetworkCurrent();
 	void _handleGetApiDiscover();
-
-	String _reconnectSSID;
-	String _reconnectPassphrase;
 };
 
 #endif /* CONFIGSERVER_H_ */

@@ -83,6 +83,16 @@ void hideVolume() {
 	FastLED.clear(true);
 }
 
+void destroyEventServer() {
+	if (eventServer) {
+		Serial.println("destroying EventServer on WiFi disconnect");
+		/* TODO unsubscribe all SIDs */
+		eventServer->stop();
+		delete eventServer;
+		eventServer = NULL;
+	}
+}
+
 void setup() {
 	Serial.begin(115200);
 	delay(500);
@@ -144,10 +154,13 @@ void setup() {
 
 	// start web server for configuration
 	configServer = new ConfigServer();
+	configServer->onBeforeNetworkChange(destroyEventServer);
 	configServer->begin();
 }
 
 void initializeEventServer() {
+	Serial.println("initializing EventServer on WiFi connect");
+
 	Serial.println(WiFi.localIP());
 	Serial.println(WiFi.SSID());
 	Serial.println(WiFi.macAddress());
@@ -232,16 +245,15 @@ void initializeEventServer() {
 	}
 }
 
-void destroyEventServer() {
-	if (eventServer) {
-		/* TODO unsubscribe all SIDs */
-		eventServer->stop();
-		delete eventServer;
-		eventServer = NULL;
-	}
-}
-
 void loop() {
+	// initialize event server if WiFi is (re-)connected
+	if (WiFi.isConnected() && !eventServer) {
+		initializeEventServer();
+	}
+	// destroy event server if WiFi disconnected unexpectedly
+	if (!WiFi.isConnected() && eventServer) {
+		destroyEventServer();
+	}
 	if (eventServer) {
 		eventServer->handleEvent();
 	}
@@ -250,22 +262,5 @@ void loop() {
 	if (active && millis() - lastWriteMillis > 2000) {
 		hideVolume();
 		active = false;
-	}
-
-	if (configServer->needsReconnect()) {
-		Serial.println("reconnecting with new WiFi");
-		destroyEventServer();
-		WiFi.disconnect();
-		/* TODO continue looping */
-		delay(1000);
-		String ssid = configServer->reconnectSSID();
-		String pass = configServer->reconnectPassphrase();
-		WiFi.begin(ssid.c_str(), pass.c_str());
-		configServer->reconnectDone();
-	}
-
-	if (WiFi.isConnected() && !eventServer) {
-		Serial.println("connected with new WiFi");
-		initializeEventServer();
 	}
 }
