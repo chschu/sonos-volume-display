@@ -111,11 +111,6 @@ bool EventServer::_renew(std::map<String, _Subscription>::iterator subIt) {
 			sub._startMillis = millis();
 			sub._renewalAfterMillis = sub._renewalThreshold * 1000.0 * actualTimeoutSeconds;
 			result = true;
-		} else {
-			// renewal failed, mark for removal
-			// TODO add notification callback for this case
-			Serial.println(F("removing subscription after failed renewal"));
-			result = true;
 		}
 		http.end();
 	}
