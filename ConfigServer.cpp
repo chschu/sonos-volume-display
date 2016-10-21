@@ -31,7 +31,7 @@ void ConfigServer::begin() {
 	_server.on("/api/network", HTTP_GET, std::bind(&ConfigServer::_handleGetApiNetwork, this));
 	_server.on("/api/network/current", HTTP_GET, std::bind(&ConfigServer::_handleGetApiNetworkCurrent, this));
 	_server.on("/api/network/current", HTTP_POST, std::bind(&ConfigServer::_handlePostApiNetworkCurrent, this));
-	_server.on("/api/room", HTTP_GET, std::bind(&ConfigServer::_handleGetApiDiscover, this));
+	_server.on("/api/room", HTTP_GET, std::bind(&ConfigServer::_handleGetApiRoom, this));
 	_server.begin();
 }
 
@@ -74,13 +74,13 @@ void ConfigServer::_handleGetApiNetwork() {
 void ConfigServer::_handleGetApiNetworkCurrent() {
 	JSON::Builder json;
 	json.beginObject();
-	String status;
 	if (WiFi.isConnected()) {
 		json.attribute(F("connected"), true);
 		json.attribute(F("ssid"), WiFi.SSID());
 		json.attribute(F("bssid"), WiFi.BSSIDstr());
 		json.attribute(F("rssi"), WiFi.RSSI());
 	} else {
+		// funny case - where does the request come from?
 		json.attribute(F("connected"), false);
 	}
 	json.endObject();
@@ -92,8 +92,7 @@ void ConfigServer::_handlePostApiNetworkCurrent() {
 	Serial.println(plain);
 	String ssid = _server.arg(F("ssid"));
 	String passphrase = _server.arg(F("passphrase"));
-	Serial.printf("got ssid = \"%s\", passphrase = \"%s\"\r\n", ssid.c_str(), passphrase.c_str());
-	if (ssid.length() && passphrase.length()) {
+	if (ssid.length()) {
 		JSON::Builder json;
 		json.value(F("OK"));
 		_server.send(201, F("application/json; charset=utf-8"), json.toString());
@@ -103,14 +102,17 @@ void ConfigServer::_handlePostApiNetworkCurrent() {
 		}
 
 		// reconnect with new SSID and passphrase
+		Serial.println(F("WiFi disconnecting"));
 		WiFi.disconnect();
-		WiFi.begin(ssid.c_str(), passphrase.c_str());
+		Serial.print(F("WiFi connecting with SSID "));
+		Serial.println(ssid);
+		WiFi.begin(ssid.c_str(), passphrase.length() ? passphrase.c_str() : NULL);
 	} else {
 		_server.send(400, F("text/plain"), F("Missing Request Argument"));
 	}
 }
 
-void ConfigServer::_handleGetApiDiscover() {
+void ConfigServer::_handleGetApiRoom() {
 	IPAddress addr;
 	if (Sonos::Discover().discoverAny(&addr)) {
 		Sonos::ZoneGroupTopology topo(addr);

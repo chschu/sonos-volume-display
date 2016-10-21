@@ -35,7 +35,7 @@ private:
 	void _handleGetApiNetwork();
 	void _handleGetApiNetworkCurrent();
 	void _handlePostApiNetworkCurrent();
-	void _handleGetApiDiscover();
+	void _handleGetApiRoom();
 };
 
 #endif /* CONFIGSERVER_H_ */
