@@ -98,7 +98,9 @@ void ConfigServer::_handlePostApiNetworkCurrent() {
 		json.value(F("OK"));
 		_server.send(201, F("application/json; charset=utf-8"), json.toString());
 
-		_beforeNetworkChangeCallback();
+		if (_beforeNetworkChangeCallback) {
+			_beforeNetworkChangeCallback();
+		}
 
 		// reconnect with new SSID and passphrase
 		WiFi.disconnect();
