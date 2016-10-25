@@ -30,6 +30,7 @@ public:
 	// append a separator (',') if required, and append a simple value
 	void value(int x);
 	void value(bool x);
+	void value(const char *x);
 	void value(const String &x);
 	void value(const __FlashStringHelper *x);
 
@@ -54,6 +55,6 @@ private:
 	void _quoted(const String &x);
 };
 
-}
+} /* namespace JSON */
 
 #endif /* JSON_BUILDER_H_ */

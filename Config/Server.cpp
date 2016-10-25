@@ -1,53 +1,55 @@
 /*
- * ConfigServer.cpp
+ * Server.cpp
  *
  *  Created on: 30 Sep 2016
  *      Author: chschu
  */
 
-#include "ConfigServer.h"
+#include "Server.h"
 
 #include <ESP8266WiFi.h>
 #include <HardwareSerial.h>
 #include <include/wl_definitions.h>
+#include <stddef.h>
 #include <WString.h>
 
-#include "JSON/Builder.h"
-#include "Sonos/Discover.h"
-#include "Sonos/ZoneGroupTopology.h"
+#include "../JSON/Builder.h"
+#include "../Sonos/Discover.h"
+#include "../Sonos/ZoneGroupTopology.h"
+#include "Persistent.h"
 
-ConfigServer::ConfigServer(IPAddress addr, uint16_t port) :
-		_server(addr, port) {
+namespace Config {
+
+Server::Server(Persistent *config, IPAddress addr, uint16_t port) :
+		_config(config), _server(addr, port) {
 }
 
-ConfigServer::ConfigServer(uint16_t port) :
-		_server(port) {
+Server::Server(Persistent *config, uint16_t port) :
+		_config(config), _server(port) {
 }
 
-ConfigServer::~ConfigServer() {
-}
-
-void ConfigServer::begin() {
-	_server.on("/api/network", HTTP_GET, std::bind(&ConfigServer::_handleGetApiNetwork, this));
-	_server.on("/api/network/current", HTTP_GET, std::bind(&ConfigServer::_handleGetApiNetworkCurrent, this));
-	_server.on("/api/network/current", HTTP_POST, std::bind(&ConfigServer::_handlePostApiNetworkCurrent, this));
-	_server.on("/api/room", HTTP_GET, std::bind(&ConfigServer::_handleGetApiRoom, this));
+void Server::begin() {
+	_server.on("/api/network", HTTP_GET, std::bind(&Server::_handleGetApiNetwork, this));
+	_server.on("/api/network/current", HTTP_GET, std::bind(&Server::_handleGetApiNetworkCurrent, this));
+	_server.on("/api/network/current", HTTP_POST, std::bind(&Server::_handlePostApiNetworkCurrent, this));
+	_server.on("/api/room", HTTP_GET, std::bind(&Server::_handleGetApiRoom, this));
+	_server.on("/api/room/current", HTTP_GET, std::bind(&Server::_handleGetApiRoomCurrent, this));
 	_server.begin();
 }
 
-void ConfigServer::handleClient() {
+void Server::handleClient() {
 	_server.handleClient();
 }
 
-void ConfigServer::stop() {
+void Server::stop() {
 	_server.stop();
 }
 
-void ConfigServer::onBeforeNetworkChange(ConfigServerBeforeNetworkChangeCallback callback) {
+void Server::onBeforeNetworkChange(ServerBeforeNetworkChangeCallback callback) {
 	_beforeNetworkChangeCallback = callback;
 }
 
-void ConfigServer::_handleGetApiNetwork() {
+void Server::_handleGetApiNetwork() {
 	int8_t n = WiFi.scanNetworks();
 
 	if (n >= 0) {
@@ -71,7 +73,7 @@ void ConfigServer::_handleGetApiNetwork() {
 	WiFi.scanDelete();
 }
 
-void ConfigServer::_handleGetApiNetworkCurrent() {
+void Server::_handleGetApiNetworkCurrent() {
 	JSON::Builder json;
 	json.beginObject();
 	if (WiFi.isConnected()) {
@@ -87,7 +89,7 @@ void ConfigServer::_handleGetApiNetworkCurrent() {
 	_server.send(200, F("application/json; charset=utf-8"), json.toString());
 }
 
-void ConfigServer::_handlePostApiNetworkCurrent() {
+void Server::_handlePostApiNetworkCurrent() {
 	String plain = _server.arg(F("plain"));
 	Serial.println(plain);
 	String ssid = _server.arg(F("ssid"));
@@ -112,7 +114,7 @@ void ConfigServer::_handlePostApiNetworkCurrent() {
 	}
 }
 
-void ConfigServer::_handleGetApiRoom() {
+void Server::_handleGetApiRoom() {
 	IPAddress addr;
 	if (Sonos::Discover().discoverAny(&addr)) {
 		Sonos::ZoneGroupTopology topo(addr);
@@ -137,3 +139,18 @@ void ConfigServer::_handleGetApiRoom() {
 		_server.send(404, F("text/plain"), F("No Devices Found"));
 	}
 }
+
+void Server::_handleGetApiRoomCurrent() {
+	JSON::Builder json;
+	json.beginObject();
+	if (_config->active()) {
+		json.attribute(F("active"), true);
+		json.attribute(F("roomUUID"), _config->roomUUID());
+	} else {
+		json.attribute(F("active"), false);
+	}
+	json.endObject();
+	_server.send(200, F("application/json; charset=utf-8"), json.toString());
+}
+
+} /* namespace Config */

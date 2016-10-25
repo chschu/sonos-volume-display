@@ -1,3 +1,6 @@
+#include "Config/Persistent.h"
+#include "Config/Server.h"
+
 #define FASTLED_ALLOW_INTERRUPTS 0
 #define FASTLED_ESP8266_RAW_PIN_ORDER
 
@@ -22,7 +25,6 @@
 
 #include "Color/Gradient.h"
 #include "Color/RGB.h"
-#include "ConfigServer.h"
 #include "Sonos/Discover.h"
 #include "Sonos/ZoneGroupTopology.h"
 #include "UPnP/EventServer.h"
@@ -35,8 +37,8 @@ const CRGB LED_TEMPERATURE = Tungsten100W;
 const uint8_t LED_BRIGHTNESS = 255;
 const float LED_GAMMA = 2.2;
 
+Config::Server *configServer = NULL;
 UPnP::EventServer *eventServer = NULL;
-ConfigServer *configServer = NULL;
 Color::Gradient gradient;
 
 CRGB leds[LED_COUNT];
@@ -153,7 +155,7 @@ void setup() {
 	}
 
 	// start web server for configuration
-	configServer = new ConfigServer();
+	configServer = new Config::Server(new Config::Persistent());
 	configServer->onBeforeNetworkChange(destroyEventServer);
 	configServer->begin();
 }

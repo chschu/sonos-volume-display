@@ -8,6 +8,7 @@
 #include "Builder.h"
 
 #include <pgmspace.h>
+#include <stddef.h>
 
 namespace JSON {
 
@@ -55,12 +56,17 @@ void Builder::value(bool x) {
 	_json += x ? F("true") : F("false");
 }
 
-void Builder::value(const __FlashStringHelper *x) {
+void Builder::value(const char *x) {
 	_separator();
 	_quoted(x);
 }
 
 void Builder::value(const String &x) {
+	_separator();
+	_quoted(x);
+}
+
+void Builder::value(const __FlashStringHelper *x) {
 	_separator();
 	_quoted(x);
 }
@@ -103,7 +109,8 @@ void Builder::_quoted(const String &x) {
 		default:
 			if (*p < ' ') {
 				char buf[7];
-				snprintf_P(buf, sizeof(buf), PSTR("\\u%04X"), *p);
+				// the static_cast is just for Eclipse CDT; it doesn't accept std::size_t for the ::size_t parameter
+				snprintf_P(buf, static_cast<size_t>(sizeof(buf)), PSTR("\\u%04X"), *p);
 				_json += buf;
 			} else {
 				_json += *p;
@@ -113,4 +120,4 @@ void Builder::_quoted(const String &x) {
 	_json += '"';
 }
 
-}
+} /* namespace JSON */
