@@ -17,14 +17,10 @@ public:
 	Persistent(uint32_t magic = 0x51DEB00B);
 
 	bool active();
-	bool setActive(bool active);
+	bool setActive(bool active, bool dryRun = false);
 
 	const char *roomUUID();
-	bool setRoomUUID(const char *roomUUID);
-
-	// load configuration from EEPROM
-	// if magic number does not match, initialize defaults and store in EEPROM
-	void load();
+	bool setRoomUUID(const char *roomUUID, bool dryRun = false);
 
 	// store configuration in EEPROM
 	void save();

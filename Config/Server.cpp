@@ -29,11 +29,12 @@ Server::Server(Persistent *config, uint16_t port) :
 }
 
 void Server::begin() {
+	_server.on("/api/discover/networks", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverNetworks, this));
+	_server.on("/api/discover/rooms", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverRooms, this));
 	_server.on("/api/network", HTTP_GET, std::bind(&Server::_handleGetApiNetwork, this));
-	_server.on("/api/network/current", HTTP_GET, std::bind(&Server::_handleGetApiNetworkCurrent, this));
-	_server.on("/api/network/current", HTTP_POST, std::bind(&Server::_handlePostApiNetworkCurrent, this));
-	_server.on("/api/room", HTTP_GET, std::bind(&Server::_handleGetApiRoom, this));
-	_server.on("/api/room/current", HTTP_GET, std::bind(&Server::_handleGetApiRoomCurrent, this));
+	_server.on("/api/network", HTTP_POST, std::bind(&Server::_handlePostApiNetwork, this));
+	_server.on("/api/config", HTTP_GET, std::bind(&Server::_handleGetApiConfig, this));
+	_server.on("/api/config", HTTP_POST, std::bind(&Server::_handlePostApiConfig, this));
 	_server.begin();
 }
 
@@ -45,11 +46,19 @@ void Server::stop() {
 	_server.stop();
 }
 
-void Server::onBeforeNetworkChange(BeforeNetworkChangeCallback callback) {
+void Server::onBeforeNetworkChange(Callback callback) {
 	_beforeNetworkChangeCallback = callback;
 }
 
-void Server::_handleGetApiNetwork() {
+void Server::onBeforeConfigurationChange(Callback callback) {
+	_beforeConfigurationChangeCallback = callback;
+}
+
+void Server::onAfterConfigurationChange(Callback callback) {
+	_afterConfigurationChangeCallback = callback;
+}
+
+void Server::_handleGetApiDiscoverNetworks() {
 	int8_t n = WiFi.scanNetworks();
 
 	if (n >= 0) {
@@ -73,48 +82,7 @@ void Server::_handleGetApiNetwork() {
 	WiFi.scanDelete();
 }
 
-void Server::_handleGetApiNetworkCurrent() {
-	JSON::Builder json;
-	json.beginObject();
-	if (WiFi.isConnected()) {
-		json.attribute(F("connected"), true);
-		json.attribute(F("ssid"), WiFi.SSID());
-		json.attribute(F("bssid"), WiFi.BSSIDstr());
-		json.attribute(F("rssi"), WiFi.RSSI());
-	} else {
-		// funny case - where does the request come from?
-		json.attribute(F("connected"), false);
-	}
-	json.endObject();
-	_server.send(200, F("application/json; charset=utf-8"), json.toString());
-}
-
-void Server::_handlePostApiNetworkCurrent() {
-	String plain = _server.arg(F("plain"));
-	Serial.println(plain);
-	String ssid = _server.arg(F("ssid"));
-	String passphrase = _server.arg(F("passphrase"));
-	if (ssid.length()) {
-		JSON::Builder json;
-		json.value(F("OK"));
-		_server.send(201, F("application/json; charset=utf-8"), json.toString());
-
-		if (_beforeNetworkChangeCallback) {
-			_beforeNetworkChangeCallback();
-		}
-
-		// reconnect with new SSID and passphrase
-		Serial.println(F("WiFi disconnecting"));
-		WiFi.disconnect();
-		Serial.print(F("WiFi connecting with SSID "));
-		Serial.println(ssid);
-		WiFi.begin(ssid.c_str(), passphrase.length() ? passphrase.c_str() : NULL);
-	} else {
-		_server.send(400, F("text/plain"), F("Missing Request Argument"));
-	}
-}
-
-void Server::_handleGetApiRoom() {
+void Server::_handleGetApiDiscoverRooms() {
 	IPAddress addr;
 	if (Sonos::Discover().discoverAny(&addr)) {
 		Sonos::ZoneGroupTopology topo(addr);
@@ -140,17 +108,91 @@ void Server::_handleGetApiRoom() {
 	}
 }
 
-void Server::_handleGetApiRoomCurrent() {
+void Server::_handleGetApiNetwork() {
 	JSON::Builder json;
 	json.beginObject();
-	if (_config->active()) {
-		json.attribute(F("active"), true);
-		json.attribute(F("roomUUID"), _config->roomUUID());
+	if (WiFi.isConnected()) {
+		json.attribute(F("connected"), true);
+		json.attribute(F("ssid"), WiFi.SSID());
+		json.attribute(F("bssid"), WiFi.BSSIDstr());
+		json.attribute(F("rssi"), WiFi.RSSI());
 	} else {
-		json.attribute(F("active"), false);
+		// funny case - where does the request come from?
+		json.attribute(F("connected"), false);
 	}
 	json.endObject();
 	_server.send(200, F("application/json; charset=utf-8"), json.toString());
+}
+
+void Server::_handlePostApiNetwork() {
+	String ssid = _server.arg(F("ssid"));
+	String passphrase = _server.arg(F("passphrase"));
+	if (ssid.length()) {
+		JSON::Builder json;
+		json.value(F("OK"));
+		_server.send(201, F("application/json; charset=utf-8"), json.toString());
+
+		if (_beforeNetworkChangeCallback) {
+			_beforeNetworkChangeCallback();
+		}
+
+		// reconnect with new SSID and passphrase
+		Serial.println(F("WiFi disconnecting"));
+		WiFi.disconnect();
+		Serial.print(F("WiFi connecting with SSID "));
+		Serial.println(ssid);
+		WiFi.begin(ssid.c_str(), passphrase.length() ? passphrase.c_str() : NULL);
+
+		if (_afterNetworkChangeCallback) {
+			_afterNetworkChangeCallback();
+		}
+	} else {
+		_server.send(400, F("text/plain"), F("Missing Request Argument"));
+	}
+}
+
+void Server::_handleGetApiConfig() {
+	JSON::Builder json;
+	json.beginObject();
+	json.attribute(F("active"), _config->active() ? F("true") : F("false"));
+	json.attribute(F("room-uuid"), _config->roomUUID());
+	json.endObject();
+	_server.send(200, F("application/json; charset=utf-8"), json.toString());
+}
+
+void Server::_handlePostApiConfig() {
+	String activeString = _server.arg(F("active"));
+	bool active;
+	if (activeString == "false") {
+		active = false;
+	} else if (activeString == "true") {
+		active = true;
+	} else {
+		_server.send(400, F("text/plain"), F("Invalid Request Argument"));
+	}
+
+	String roomUUIDString = _server.arg(F("room-uuid"));
+	const char *roomUUID = roomUUIDString.c_str();
+
+	if (_config->setActive(active, true) && _config->setRoomUUID(roomUUID, true)) {
+		JSON::Builder json;
+		json.value(F("OK"));
+		_server.send(201, F("application/json; charset=utf-8"), json.toString());
+
+		if (_beforeConfigurationChangeCallback) {
+			_beforeConfigurationChangeCallback();
+		}
+
+		_config->setActive(active);
+		_config->setRoomUUID(roomUUID);
+		_config->save();
+
+		if (_afterConfigurationChangeCallback) {
+			_afterConfigurationChangeCallback();
+		}
+	} else {
+		_server.send(400, F("text/plain"), F("Invalid Request Argument"));
+	}
 }
 
 } /* namespace Config */

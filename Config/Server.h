@@ -19,29 +19,45 @@ class Persistent;
 
 class Server {
 public:
-	typedef std::function<void()> BeforeNetworkChangeCallback;
+	typedef std::function<void()> Callback;
 
-	Server(Persistent *config, IPAddress addr, uint16_t port = 80);
-	Server(Persistent *config, uint16_t port = 80);
+	Server(Persistent *_config, IPAddress addr, uint16_t port = 80);
+	Server(Persistent *_config, uint16_t port = 80);
 
 	void begin();
 	void handleClient();
 	void stop();
 
-	// set the callback for cleanup before reconnecting to a new WiFi network
-	void onBeforeNetworkChange(BeforeNetworkChangeCallback callback);
+	// set the callback for cleanup before disconnecting from the current WiFi network
+	void onBeforeNetworkChange(Callback callback);
+
+	// set the callback for cleanup before disconnecting from the current WiFi network
+	// the WiFi connection is probably not yet established when the callback is invoked
+	void onAfterNetworkChange(Callback callback);
+
+	// set the callback for cleanup before a configuration change
+	void onBeforeConfigurationChange(Callback callback);
+
+	// set the callback for initialization after a configuration change
+	void onAfterConfigurationChange(Callback callback);
 
 private:
 	Persistent *_config;
 
 	ESP8266WebServer _server;
-	BeforeNetworkChangeCallback _beforeNetworkChangeCallback;
 
+	Callback _beforeNetworkChangeCallback;
+	Callback _afterNetworkChangeCallback;
+
+	Callback _beforeConfigurationChangeCallback;
+	Callback _afterConfigurationChangeCallback;
+
+	void _handleGetApiDiscoverNetworks();
+	void _handleGetApiDiscoverRooms();
 	void _handleGetApiNetwork();
-	void _handleGetApiNetworkCurrent();
-	void _handlePostApiNetworkCurrent();
-	void _handleGetApiRoom();
-	void _handleGetApiRoomCurrent();
+	void _handlePostApiNetwork();
+	void _handleGetApiConfig();
+	void _handlePostApiConfig();
 };
 
 } /* namespace Config */

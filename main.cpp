@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "Config/Persistent.h"
 #include "Config/Server.h"
 
@@ -37,7 +39,7 @@ const CRGB LED_TEMPERATURE = Tungsten100W;
 const uint8_t LED_BRIGHTNESS = 255;
 const float LED_GAMMA = 2.2;
 
-Config::Server *configServer = NULL;
+Config::Server *configServer;
 UPnP::EventServer *eventServer = NULL;
 Color::Gradient gradient;
 
