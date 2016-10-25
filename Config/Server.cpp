@@ -45,7 +45,7 @@ void Server::stop() {
 	_server.stop();
 }
 
-void Server::onBeforeNetworkChange(ServerBeforeNetworkChangeCallback callback) {
+void Server::onBeforeNetworkChange(BeforeNetworkChangeCallback callback) {
 	_beforeNetworkChangeCallback = callback;
 }
 

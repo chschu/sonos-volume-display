@@ -34,7 +34,7 @@ Discover::Discover() {
 Discover::~Discover() {
 }
 
-bool Discover::discover(DiscoverCallback callback, const char *st, uint8_t mx, unsigned long timeoutMillis) {
+bool Discover::discover(Callback callback, const char *st, uint8_t mx, unsigned long timeoutMillis) {
 	WiFiUDP udp;
 
 	// start UDP connection on a random port

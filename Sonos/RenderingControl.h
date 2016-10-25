@@ -14,10 +14,10 @@
 
 namespace Sonos {
 
-typedef std::function<void(uint16_t volume)> GetVolumeCallback;
-
 class RenderingControl {
 public:
+	typedef std::function<void(uint16_t volume)> GetVolumeCallback;
+
 	RenderingControl(IPAddress deviceIP);
 	~RenderingControl();
 

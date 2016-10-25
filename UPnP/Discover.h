@@ -10,15 +10,16 @@
 
 #include <IPAddress.h>
 #include <Stream.h>
+#include <cstdint>
 #include <functional>
 
 namespace UPnP {
 
-// discovery callback type
-typedef std::function<bool(IPAddress remoteIP, Stream &stream)> DiscoverCallback;
-
 class Discover {
 public:
+	// discovery callback type
+	typedef std::function<bool(IPAddress remoteIP, Stream &stream)> Callback;
+
 	Discover();
 	~Discover();
 
@@ -26,7 +27,7 @@ public:
 	// for every response received within the timeout, the callback is invoked
 	// if the callback returns false, discovery is terminated
 	// returns false if discovery failed; not receiving any response is NOT considered a failure
-	bool discover(DiscoverCallback callback, const char *st, uint8_t mx = 4, unsigned long timeoutMillis = 5000);
+	bool discover(Callback callback, const char *st, uint8_t mx = 4, unsigned long timeoutMillis = 5000);
 };
 
 }

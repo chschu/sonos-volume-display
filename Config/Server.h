@@ -17,10 +17,10 @@ namespace Config {
 
 class Persistent;
 
-typedef std::function<void()> ServerBeforeNetworkChangeCallback;
-
 class Server {
 public:
+	typedef std::function<void()> BeforeNetworkChangeCallback;
+
 	Server(Persistent *config, IPAddress addr, uint16_t port = 80);
 	Server(Persistent *config, uint16_t port = 80);
 
@@ -29,13 +29,13 @@ public:
 	void stop();
 
 	// set the callback for cleanup before reconnecting to a new WiFi network
-	void onBeforeNetworkChange(ServerBeforeNetworkChangeCallback callback);
+	void onBeforeNetworkChange(BeforeNetworkChangeCallback callback);
 
 private:
 	Persistent *_config;
 
 	ESP8266WebServer _server;
-	ServerBeforeNetworkChangeCallback _beforeNetworkChangeCallback;
+	BeforeNetworkChangeCallback _beforeNetworkChangeCallback;
 
 	void _handleGetApiNetwork();
 	void _handleGetApiNetworkCurrent();

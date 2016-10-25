@@ -22,10 +22,10 @@ struct ZoneInfo {
 	boolean visible;
 };
 
-typedef std::function<void(ZoneInfo info)> ZoneInfoCallback;
-
 class ZoneGroupTopology {
 public:
+	typedef std::function<void(ZoneInfo info)> ZoneInfoCallback;
+
 	ZoneGroupTopology(IPAddress deviceIP);
 	~ZoneGroupTopology();
 
