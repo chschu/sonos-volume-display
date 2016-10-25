@@ -39,6 +39,7 @@ const CRGB LED_TEMPERATURE = Tungsten100W;
 const uint8_t LED_BRIGHTNESS = 255;
 const float LED_GAMMA = 2.2;
 
+Config::Persistent *config;
 Config::Server *configServer;
 UPnP::EventServer *eventServer = NULL;
 Color::Gradient gradient;
@@ -87,10 +88,112 @@ void hideVolume() {
 	FastLED.clear(true);
 }
 
+void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
+	Serial.print(F("Discovered: "));
+	Serial.print(info.name);
+	Serial.print(F(" @ "));
+	Serial.println(info.playerIP);
+
+	/* TODO handle subscription failure */
+
+	String newSID;
+	eventServer->subscribe([info](String SID, Stream &stream) {
+		int32_t master = -1, lf = -1, rf = -1;
+		XML::extractEncodedTags(stream, "</LastChange>", [&master, &lf, &rf](String tag) -> bool {
+
+					if (!tag.startsWith("<Volume ")) {
+						/* continue tag extraction */
+						return true;
+					}
+
+					String channel;
+					if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
+						Serial.println(F("Failed to extract channel attribute from tag"));
+						return false;
+					};
+
+					String val;
+					if (!XML::extractAttributeValue(tag, F("val"), &val)) {
+						Serial.println(F("Failed to extract val attribute from tag"));
+						return false;
+					};
+
+					uint16_t volume = 0;
+					for (const char *p = val.c_str(); *p; p++) {
+						if (isdigit(*p)) {
+							volume = 10 * volume + (*p - '0');
+						} else {
+							Serial.println(F("Found a non-digit in val"));
+							return false;
+						}
+						if (volume > 100) {
+							Serial.println(F("Too large val"));
+							return false;
+						}
+					}
+
+					if (channel == "Master") {
+						master = volume;
+					} else if (channel == "LF") {
+						lf = volume;
+					} else if (channel == "RF") {
+						rf = volume;
+					}
+
+					return true;
+				});
+
+		/* TODO keep track of current volume/mute state*/
+		if (master != -1 && lf != -1 && rf != -1) {
+			Serial.printf("%s: Master = %u, LF = %u, RF = %u\r\n", info.name.c_str(), master, lf, rf);
+			showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0);
+			active = true;
+			lastWriteMillis = millis();
+		}
+
+	}, "http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
+
+	Serial.print(F("Subscribed with new SID "));
+	Serial.println(newSID);
+}
+
+void initializeSubscription() {
+	if (eventServer && config->active()) {
+		Sonos::Discover discover;
+		IPAddress addr;
+		if (discover.discoverAny(&addr)) {
+			Serial.print(F("Found a device: "));
+			Serial.println(addr);
+
+			Sonos::ZoneGroupTopology topo(addr);
+			bool discoverResult = topo.GetZoneGroupState_Decoded([](Sonos::ZoneInfo info) {
+				if (info.uuid == config->roomUUID()) {
+					subscribeToVolumeChange(info);
+				}
+			});
+		}
+	}
+}
+
+void destroySubscription() {
+	if (eventServer) {
+		eventServer->unsubscribeAll();
+	}
+}
+
+void initializeEventServer() {
+	Serial.println("initializing EventServer on WiFi connect");
+
+	Serial.println(WiFi.localIP());
+	Serial.println(WiFi.SSID());
+	Serial.println(WiFi.macAddress());
+	eventServer = new UPnP::EventServer(WiFi.localIP());
+	eventServer->begin();
+}
+
 void destroyEventServer() {
 	if (eventServer) {
 		Serial.println("destroying EventServer on WiFi disconnect");
-		/* TODO unsubscribe all SIDs */
 		eventServer->stop();
 		delete eventServer;
 		eventServer = NULL;
@@ -157,105 +260,23 @@ void setup() {
 	}
 
 	// start web server for configuration
-	configServer = new Config::Server(new Config::Persistent());
+	config = new Config::Persistent();
+	configServer = new Config::Server(config);
 	configServer->onBeforeNetworkChange(destroyEventServer);
+	configServer->onBeforeConfigurationChange(destroySubscription);
+	configServer->onAfterConfigurationChange(initializeSubscription);
 	configServer->begin();
-}
-
-void initializeEventServer() {
-	Serial.println("initializing EventServer on WiFi connect");
-
-	Serial.println(WiFi.localIP());
-	Serial.println(WiFi.SSID());
-	Serial.println(WiFi.macAddress());
-	eventServer = new UPnP::EventServer(WiFi.localIP());
-	eventServer->begin();
-
-	Sonos::Discover discover;
-	IPAddress addr;
-	if (discover.discoverAny(&addr)) {
-		Serial.print(F("Found a device: "));
-		Serial.println(addr);
-
-		Sonos::ZoneGroupTopology topo(addr);
-		bool discoverResult = topo.GetZoneGroupState_Decoded([](Sonos::ZoneInfo info) {
-			Serial.print(F("Discovered: "));
-			Serial.print(info.name);
-			Serial.print(F(" @ "));
-			Serial.println(info.playerIP);
-
-			/* TODO handle subscription failure */
-
-			String newSID;
-			eventServer->subscribe([info](String SID, Stream &stream) {
-						int32_t master = -1, lf = -1, rf = -1;
-						XML::extractEncodedTags(stream, "</LastChange>", [&master, &lf, &rf](String tag) -> bool {
-
-									if (!tag.startsWith("<Volume ")) {
-										/* continue tag extraction */
-										return true;
-									}
-
-									String channel;
-									if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
-										Serial.println(F("Failed to extract channel attribute from tag"));
-										return false;
-									};
-
-									String val;
-									if (!XML::extractAttributeValue(tag, F("val"), &val)) {
-										Serial.println(F("Failed to extract val attribute from tag"));
-										return false;
-									};
-
-									uint16_t volume = 0;
-									for (const char *p = val.c_str(); *p; p++) {
-										if (isdigit(*p)) {
-											volume = 10 * volume + (*p - '0');
-										} else {
-											Serial.println(F("Found a non-digit in val"));
-											return false;
-										}
-										if (volume > 100) {
-											Serial.println(F("Too large val"));
-											return false;
-										}
-									}
-
-									if (channel == "Master") {
-										master = volume;
-									} else if (channel == "LF") {
-										lf = volume;
-									} else if (channel == "RF") {
-										rf = volume;
-									}
-
-									return true;
-								});
-
-						/* TODO keep track of current volume/mute state*/
-						if (master != -1 && lf != -1 && rf != -1) {
-							Serial.printf("%s: Master = %u, LF = %u, RF = %u\r\n", info.name.c_str(), master, lf, rf);
-							showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0);
-							active = true;
-							lastWriteMillis = millis();
-						}
-
-					}, "http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
-
-			Serial.print(F("Subscribed with new SID "));
-			Serial.println(newSID);
-		});
-	}
 }
 
 void loop() {
 	// initialize event server if WiFi is (re-)connected
 	if (WiFi.isConnected() && !eventServer) {
 		initializeEventServer();
+		initializeSubscription();
 	}
 	// destroy event server if WiFi disconnected unexpectedly
 	if (!WiFi.isConnected() && eventServer) {
+		// cannot unsubscribe here, because WiFi is not connected
 		destroyEventServer();
 	}
 	if (eventServer) {

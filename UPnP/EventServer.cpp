@@ -137,6 +137,15 @@ bool EventServer::unsubscribe(String SID) {
 	return result;
 }
 
+void EventServer::unsubscribeAll() {
+	while (!_subscriptionForSID.empty()) {
+		if (!unsubscribe(_subscriptionForSID.begin()->first)) {
+			// unsubscribe failed, remove it nevertheless
+			_subscriptionForSID.erase(_subscriptionForSID.begin());
+		}
+	}
+}
+
 const char NOTIFY_RESPONSE[] PROGMEM = "HTTP/1.1 %u %s\r\n\r\n";
 
 static void sendResponse(WiFiClient &client, uint16_t statusCode, String statusText) {

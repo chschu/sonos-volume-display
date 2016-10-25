@@ -42,6 +42,9 @@ public:
 	// unsubscribe from an event specified by its SID
 	bool unsubscribe(String SID);
 
+	// unsubscribe from all known events
+	void unsubscribeAll();
+
 	// handle events and subscription renewal
 	void handleEvent();
 
