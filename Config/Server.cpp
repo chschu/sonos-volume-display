@@ -161,37 +161,51 @@ void Server::_handleGetApiConfig() {
 }
 
 void Server::_handlePostApiConfig() {
-	String activeString = _server.arg(F("active"));
 	bool active;
-	if (activeString == "false") {
-		active = false;
-	} else if (activeString == "true") {
-		active = true;
+	String roomUUID;
+
+	if (_server.hasArg(F("active"))) {
+		String activeString = _server.arg(F("active"));
+		if (activeString == "false") {
+			active = false;
+		} else if (activeString == "true") {
+			active = true;
+		} else {
+			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
+			return;
+		}
+		if (!_config->setActive(active, true)) {
+			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
+			return;
+		}
 	} else {
-		_server.send(400, F("text/plain"), F("Invalid Request Argument"));
+		active = _config->active();
 	}
 
-	String roomUUIDString = _server.arg(F("room-uuid"));
-	const char *roomUUID = roomUUIDString.c_str();
-
-	if (_config->setActive(active, true) && _config->setRoomUUID(roomUUID, true)) {
-		JSON::Builder json;
-		json.value(F("OK"));
-		_server.send(201, F("application/json; charset=utf-8"), json.toString());
-
-		if (_beforeConfigurationChangeCallback) {
-			_beforeConfigurationChangeCallback();
-		}
-
-		_config->setActive(active);
-		_config->setRoomUUID(roomUUID);
-		_config->save();
-
-		if (_afterConfigurationChangeCallback) {
-			_afterConfigurationChangeCallback();
+	if (_server.hasArg(F("room-uuid"))) {
+		roomUUID = _server.arg(F("room-uuid"));
+		if (!_config->setRoomUUID(roomUUID.c_str(), true)) {
+			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
+			return;
 		}
 	} else {
-		_server.send(400, F("text/plain"), F("Invalid Request Argument"));
+		roomUUID = _config->roomUUID();
+	}
+
+	JSON::Builder json;
+	json.value(F("OK"));
+	_server.send(201, F("application/json; charset=utf-8"), json.toString());
+
+	if (_beforeConfigurationChangeCallback) {
+		_beforeConfigurationChangeCallback();
+	}
+
+	_config->setActive(active);
+	_config->setRoomUUID(roomUUID.c_str());
+	_config->save();
+
+	if (_afterConfigurationChangeCallback) {
+		_afterConfigurationChangeCallback();
 	}
 }
 
