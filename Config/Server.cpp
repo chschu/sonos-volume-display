@@ -20,11 +20,11 @@
 
 namespace Config {
 
-Server::Server(Persistent *config, IPAddress addr, uint16_t port) :
+Server::Server(Persistent &config, IPAddress addr, uint16_t port) :
 		_config(config), _server(addr, port) {
 }
 
-Server::Server(Persistent *config, uint16_t port) :
+Server::Server(Persistent &config, uint16_t port) :
 		_config(config), _server(port) {
 }
 
@@ -154,8 +154,8 @@ void Server::_handlePostApiNetwork() {
 void Server::_handleGetApiConfig() {
 	JSON::Builder json;
 	json.beginObject();
-	json.attribute(F("active"), _config->active() ? F("true") : F("false"));
-	json.attribute(F("room-uuid"), _config->roomUUID());
+	json.attribute(F("active"), _config.active() ? F("true") : F("false"));
+	json.attribute(F("room-uuid"), _config.roomUUID());
 	json.endObject();
 	_server.send(200, F("application/json; charset=utf-8"), json.toString());
 }
@@ -174,22 +174,22 @@ void Server::_handlePostApiConfig() {
 			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
 			return;
 		}
-		if (!_config->setActive(active, true)) {
+		if (!_config.setActive(active, true)) {
 			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
 			return;
 		}
 	} else {
-		active = _config->active();
+		active = _config.active();
 	}
 
 	if (_server.hasArg(F("room-uuid"))) {
 		roomUUID = _server.arg(F("room-uuid"));
-		if (!_config->setRoomUUID(roomUUID.c_str(), true)) {
+		if (!_config.setRoomUUID(roomUUID.c_str(), true)) {
 			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
 			return;
 		}
 	} else {
-		roomUUID = _config->roomUUID();
+		roomUUID = _config.roomUUID();
 	}
 
 	JSON::Builder json;
@@ -200,9 +200,9 @@ void Server::_handlePostApiConfig() {
 		_beforeConfigurationChangeCallback();
 	}
 
-	_config->setActive(active);
-	_config->setRoomUUID(roomUUID.c_str());
-	_config->save();
+	_config.setActive(active);
+	_config.setRoomUUID(roomUUID.c_str());
+	_config.save();
 
 	if (_afterConfigurationChangeCallback) {
 		_afterConfigurationChangeCallback();

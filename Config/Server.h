@@ -21,8 +21,8 @@ class Server {
 public:
 	typedef std::function<void()> Callback;
 
-	Server(Persistent *_config, IPAddress addr, uint16_t port = 80);
-	Server(Persistent *_config, uint16_t port = 80);
+	Server(Persistent &config, IPAddress addr, uint16_t port = 80);
+	Server(Persistent &config, uint16_t port = 80);
 
 	void begin();
 	void handleClient();
@@ -42,7 +42,7 @@ public:
 	void onAfterConfigurationChange(Callback callback);
 
 private:
-	Persistent *_config;
+	Persistent &_config;
 
 	ESP8266WebServer _server;
 

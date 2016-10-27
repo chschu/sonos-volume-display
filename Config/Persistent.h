@@ -22,6 +22,10 @@ public:
 	const char *roomUUID();
 	bool setRoomUUID(const char *roomUUID, bool dryRun = false);
 
+	// (re-)load configuration from EEPROM
+	// if magic number does not match, initialize defaults and store in EEPROM
+	void load();
+
 	// store configuration in EEPROM
 	void save();
 

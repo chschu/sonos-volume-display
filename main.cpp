@@ -39,8 +39,8 @@ const CRGB LED_TEMPERATURE = Tungsten100W;
 const uint8_t LED_BRIGHTNESS = 255;
 const float LED_GAMMA = 2.2;
 
-Config::Persistent *config;
-Config::Server *configServer;
+Config::Persistent config;
+Config::Server configServer(config);
 UPnP::EventServer *eventServer = NULL;
 Color::Gradient gradient;
 
@@ -158,7 +158,7 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 }
 
 void initializeSubscription() {
-	if (eventServer && config->active()) {
+	if (eventServer && config.active()) {
 		Sonos::Discover discover;
 		IPAddress addr;
 		if (discover.discoverAny(&addr)) {
@@ -167,7 +167,7 @@ void initializeSubscription() {
 
 			Sonos::ZoneGroupTopology topo(addr);
 			bool discoverResult = topo.GetZoneGroupState_Decoded([](Sonos::ZoneInfo info) {
-				if (info.uuid == config->roomUUID()) {
+				if (info.uuid == config.roomUUID()) {
 					subscribeToVolumeChange(info);
 				}
 			});
@@ -259,13 +259,14 @@ void setup() {
 		delay(2);
 	}
 
+	// load configuration from EEPROM
+	config.load();
+
 	// start web server for configuration
-	config = new Config::Persistent();
-	configServer = new Config::Server(config);
-	configServer->onBeforeNetworkChange(destroyEventServer);
-	configServer->onBeforeConfigurationChange(destroySubscription);
-	configServer->onAfterConfigurationChange(initializeSubscription);
-	configServer->begin();
+	configServer.onBeforeNetworkChange(destroyEventServer);
+	configServer.onBeforeConfigurationChange(destroySubscription);
+	configServer.onAfterConfigurationChange(initializeSubscription);
+	configServer.begin();
 }
 
 void loop() {
@@ -282,7 +283,7 @@ void loop() {
 	if (eventServer) {
 		eventServer->handleEvent();
 	}
-	configServer->handleClient();
+	configServer.handleClient();
 
 	if (active && millis() - lastWriteMillis > 2000) {
 		hideVolume();

@@ -17,19 +17,6 @@ namespace Config {
 
 Persistent::Persistent(uint32_t magic) :
 		_magic(magic) {
-	size_t size = sizeof(_data);
-	EEPROM.begin(size);
-	EEPROM.get(0, _data);
-	if (_data.magic == _magic) {
-		Serial.println(F("magic number found, using configuration from EEPROM"));
-	} else {
-		Serial.println(F("magic number not found, initializing configuration in EEPROM"));
-		memset(&_data, 0, size);
-		_data.magic = _magic;
-		_data.active = false;
-		EEPROM.put(0, _data);
-	}
-	EEPROM.end();
 }
 
 bool Persistent::active() {
@@ -55,6 +42,22 @@ bool Persistent::setRoomUUID(const char *roomUUID, bool dryRun) {
 		strcpy(_data.roomUUID, roomUUID);
 	}
 	return true;
+}
+
+void Persistent::load() {
+	size_t size = sizeof(_data);
+	EEPROM.begin(size);
+	EEPROM.get(0, _data);
+	if (_data.magic == _magic) {
+		Serial.println(F("magic number found, using configuration from EEPROM"));
+	} else {
+		Serial.println(F("magic number not found, initializing configuration in EEPROM"));
+		memset(&_data, 0, size);
+		_data.magic = _magic;
+		_data.active = false;
+		EEPROM.put(0, _data);
+	}
+	EEPROM.end();
 }
 
 void Persistent::save() {
