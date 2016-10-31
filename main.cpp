@@ -1,5 +1,6 @@
 #include <cstring>
 
+#include "Color/ColorCycle.h"
 #include "Config/Persistent.h"
 #include "Config/Server.h"
 
@@ -49,62 +50,55 @@ Color::Gradient gradient;
 CRGB leds[LED_COUNT];
 
 // rainbow cycle for startup animation
-const uint16_t RAINBOW_LENGTH = 57;
-CRGB rainbow[RAINBOW_LENGTH];
+const uint16_t COLOR_CYCLE_LENGTH = 57;
+const Color::ColorCycle COLOR_CYCLE(COLOR_CYCLE_LENGTH, 0, COLOR_CYCLE_LENGTH / 3, 2 * COLOR_CYCLE_LENGTH / 3);
+uint16_t colorCycleOffset;
 
 bool showing;
 unsigned long showingStartMillis = 0;
-bool ready;
+bool ready = false;
 bool initialized = false;
 uint16_t ledOffset;
-uint16_t rainbowOffset;
 Ticker ticker;
 
 void setReady(bool value) {
-	if (!initialized) {
-		for (int i = 0; i < RAINBOW_LENGTH; i++) {
-			float phi = 2.0 * PI * i / RAINBOW_LENGTH;
-			uint8_t r = 127.5 * (1.0 + sin(phi + 0.0 * PI / 3.0));
-			uint8_t g = 127.5 * (1.0 + sin(phi + 2.0 * PI / 3.0));
-			uint8_t b = 127.5 * (1.0 + sin(phi + 4.0 * PI / 3.0));
-			rainbow[i] = applyGamma_video(CRGB(r, g, b), LED_GAMMA);
+	if (!initialized || (value != ready)) {
+		if (!value) {
+			FastLED.clear();
+			ledOffset = 0;
+			colorCycleOffset = 0;
+			ticker.attach_ms(40, []() {
+				for (int i = 0; i < LED_COUNT; i++) {
+					leds[i] = leds[i].fadeToBlackBy(20);
+				}
+				Color::RGB color = COLOR_CYCLE.get(colorCycleOffset);
+				leds[ledOffset] = applyGamma_video(CRGB(color.red, color.green, color.blue), LED_GAMMA);
+				if (++ledOffset == LED_COUNT) {
+					ledOffset = 0;
+				}
+				if (++colorCycleOffset == COLOR_CYCLE_LENGTH) {
+					colorCycleOffset = 0;
+				}
+				FastLED.show();
+			});
+		} else {
+			ticker.detach();
+			FastLED.clear(true);
 		}
+		ready = value;
+		initialized = true;
 	}
-
-	if (value && (!initialized || !ready)) {
-		ticker.detach();
-		FastLED.clear(true);
-	} else if (!value && (!initialized || ready)) {
-		FastLED.clear();
-		ledOffset = 0;
-		rainbowOffset = 0;
-		ticker.attach_ms(40, []() {
-			for (int i = 0; i < LED_COUNT; i++) {
-				leds[i] = leds[i].fadeToBlackBy(20);
-			}
-			float phi = 2.0 * PI * rainbowOffset / RAINBOW_LENGTH;
-			leds[ledOffset] = rainbow[rainbowOffset];
-			if (++ledOffset == LED_COUNT) {
-				ledOffset = 0;
-			}
-			if (++rainbowOffset == RAINBOW_LENGTH) {
-				rainbowOffset = 0;
-			}
-			FastLED.show();
-		});
-	}
-
-	initialized = true;
-	ready = value;
 }
 
 void showVolume(const Color::Pattern &pattern, float left, float right) {
+	if (!ready) {
+		return;
+	}
+
 	Serial.print(F("showing left="));
 	Serial.print(left);
 	Serial.print(", right=");
 	Serial.println(right);
-
-	setReady(true);
 
 	FastLED.clear();
 
@@ -140,6 +134,10 @@ void showVolume(const Color::Pattern &pattern, float left, float right) {
 }
 
 void hideVolume() {
+	if (!ready) {
+		return;
+	}
+
 	Serial.println(F("hiding"));
 
 	FastLED.clear(true);
@@ -211,6 +209,7 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	if (result) {
 		Serial.print(F("Subscribed with new SID "));
 		Serial.println(newSID);
+		setReady(true);
 	} else {
 		Serial.print(F("Subscription failed"));
 	}
