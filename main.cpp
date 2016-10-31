@@ -18,12 +18,14 @@
 #include <HardwareSerial.h>
 #include <IPAddress.h>
 #include <pins_arduino.h>
+#include <Ticker.h>
 
 #include <stddef.h>
 #include <WString.h>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cassert>
 
 #include "Color/Gradient.h"
 #include "Color/RGB.h"
@@ -46,10 +48,64 @@ Color::Gradient gradient;
 
 CRGB leds[LED_COUNT];
 
-bool active = false;
-unsigned long lastWriteMillis = 0;
+// rainbow cycle for startup animation
+const uint16_t RAINBOW_LENGTH = 57;
+CRGB rainbow[RAINBOW_LENGTH];
+
+bool showing;
+unsigned long showingStartMillis = 0;
+bool ready;
+bool initialized = false;
+uint16_t ledOffset;
+uint16_t rainbowOffset;
+Ticker ticker;
+
+void setReady(bool value) {
+	if (!initialized) {
+		for (int i = 0; i < RAINBOW_LENGTH; i++) {
+			float phi = 2.0 * PI * i / RAINBOW_LENGTH;
+			uint8_t r = 127.5 * (1.0 + sin(phi + 0.0 * PI / 3.0));
+			uint8_t g = 127.5 * (1.0 + sin(phi + 2.0 * PI / 3.0));
+			uint8_t b = 127.5 * (1.0 + sin(phi + 4.0 * PI / 3.0));
+			rainbow[i] = applyGamma_video(CRGB(r, g, b), LED_GAMMA);
+		}
+	}
+
+	if (value && (!initialized || !ready)) {
+		ticker.detach();
+		FastLED.clear(true);
+	} else if (!value && (!initialized || ready)) {
+		FastLED.clear();
+		ledOffset = 0;
+		rainbowOffset = 0;
+		ticker.attach_ms(40, []() {
+			for (int i = 0; i < LED_COUNT; i++) {
+				leds[i] = leds[i].fadeToBlackBy(20);
+			}
+			float phi = 2.0 * PI * rainbowOffset / RAINBOW_LENGTH;
+			leds[ledOffset] = rainbow[rainbowOffset];
+			if (++ledOffset == LED_COUNT) {
+				ledOffset = 0;
+			}
+			if (++rainbowOffset == RAINBOW_LENGTH) {
+				rainbowOffset = 0;
+			}
+			FastLED.show();
+		});
+	}
+
+	initialized = true;
+	ready = value;
+}
 
 void showVolume(const Color::Pattern &pattern, float left, float right) {
+	Serial.print(F("showing left="));
+	Serial.print(left);
+	Serial.print(", right=");
+	Serial.println(right);
+
+	setReady(true);
+
 	FastLED.clear();
 
 	float leftLed = LED_COUNT / 2 * left;
@@ -84,7 +140,8 @@ void showVolume(const Color::Pattern &pattern, float left, float right) {
 }
 
 void hideVolume() {
-	Serial.println("hiding");
+	Serial.println(F("hiding"));
+
 	FastLED.clear(true);
 }
 
@@ -94,10 +151,8 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	Serial.print(F(" @ "));
 	Serial.println(info.playerIP);
 
-	/* TODO handle subscription failure */
-
 	String newSID;
-	eventServer->subscribe([info](String SID, Stream &stream) {
+	bool result = eventServer->subscribe([info](String SID, Stream &stream) {
 		int32_t master = -1, lf = -1, rf = -1;
 		XML::extractEncodedTags(stream, "</LastChange>", [&master, &lf, &rf](String tag) -> bool {
 
@@ -147,18 +202,24 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 		if (master != -1 && lf != -1 && rf != -1) {
 			Serial.printf("%s: Master = %u, LF = %u, RF = %u\r\n", info.name.c_str(), master, lf, rf);
 			showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0);
-			active = true;
-			lastWriteMillis = millis();
+			showing = true;
+			showingStartMillis = millis();
 		}
 
 	}, "http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
 
-	Serial.print(F("Subscribed with new SID "));
-	Serial.println(newSID);
+	if (result) {
+		Serial.print(F("Subscribed with new SID "));
+		Serial.println(newSID);
+	} else {
+		Serial.print(F("Subscription failed"));
+	}
 }
 
 void initializeSubscription() {
-	if (eventServer && config.active()) {
+	if (!config.active()) {
+		setReady(true);
+	} else if (eventServer) {
 		Sonos::Discover discover;
 		IPAddress addr;
 		if (discover.discoverAny(&addr)) {
@@ -176,6 +237,8 @@ void initializeSubscription() {
 }
 
 void destroySubscription() {
+	setReady(false);
+
 	if (eventServer) {
 		eventServer->unsubscribeAll();
 	}
@@ -192,6 +255,8 @@ void initializeEventServer() {
 }
 
 void destroyEventServer() {
+	setReady(false);
+
 	if (eventServer) {
 		Serial.println("destroying EventServer on WiFi disconnect");
 		eventServer->stop();
@@ -203,6 +268,8 @@ void destroyEventServer() {
 void setup() {
 	Serial.begin(115200);
 	delay(500);
+
+	setReady(false);
 
 	WiFi.mode(WIFI_AP_STA);
 	WiFi.softAP((String("SVD-") + String(ESP.getChipId(), 16)).c_str(), "q1w2e3r4");
@@ -241,24 +308,6 @@ void setup() {
 	FastLED.setTemperature(LED_TEMPERATURE);
 	FastLED.setBrightness(LED_BRIGHTNESS);
 
-	// show startup animation
-	for (int i = 0; i <= 100; i++) {
-		showVolume(gradient, i / 100.0, i / 100.0);
-		delay(2);
-	}
-	delay(498);
-	for (int i = 0; i < 4; i++) {
-		showVolume(gradient, 0.0, 0.0);
-		delay(200);
-		showVolume(gradient, 1.0, 1.0);
-		delay(200);
-	}
-	delay(300);
-	for (int i = 99; i >= 0; i--) {
-		showVolume(gradient, i / 100.0, i / 100.0);
-		delay(2);
-	}
-
 	// load configuration from EEPROM
 	config.load();
 
@@ -285,8 +334,8 @@ void loop() {
 	}
 	configServer.handleClient();
 
-	if (active && millis() - lastWriteMillis > 2000) {
+	if (showing && millis() - showingStartMillis > 2000) {
 		hideVolume();
-		active = false;
+		showing = false;
 	}
 }
