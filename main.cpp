@@ -328,6 +328,17 @@ void loop() {
 		// cannot unsubscribe here, because WiFi is not connected
 		destroyEventServer();
 	}
+
+	// disable AP if WiFi is connected, enable AP if WiFi is disconnected
+	bool connected = WiFi.isConnected();
+	WiFiMode_t mode = WiFi.getMode();
+	bool accessPoint = mode == WIFI_AP || mode == WIFI_AP_STA;
+	if (connected == accessPoint) {
+		Serial.print(!connected ? F("en") : F("dis"));
+		Serial.println(F("abling AP"));
+		WiFi.enableAP(!connected);
+	}
+
 	if (eventServer) {
 		eventServer->handleEvent();
 	}
