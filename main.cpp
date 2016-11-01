@@ -49,6 +49,9 @@ Color::Gradient gradient;
 
 CRGB leds[LED_COUNT];
 
+// color for mute
+const Color::RGB MUTE_COLOR = { 0, 0, 63 };
+
 // rainbow cycle for startup animation
 const uint16_t COLOR_CYCLE_LENGTH = 57;
 const Color::ColorCycle COLOR_CYCLE(COLOR_CYCLE_LENGTH, 0, COLOR_CYCLE_LENGTH / 3, 2 * COLOR_CYCLE_LENGTH / 3);
@@ -90,7 +93,7 @@ void setReady(bool value) {
 	}
 }
 
-void showVolume(const Color::Pattern &pattern, float left, float right) {
+void showVolume(const Color::Pattern &pattern, float left, float right, bool mute) {
 	if (!ready) {
 		return;
 	}
@@ -98,7 +101,9 @@ void showVolume(const Color::Pattern &pattern, float left, float right) {
 	Serial.print(F("showing left="));
 	Serial.print(left);
 	Serial.print(", right=");
-	Serial.println(right);
+	Serial.print(right);
+	Serial.print(", mute=");
+	Serial.println(mute);
 
 	FastLED.clear();
 
@@ -106,13 +111,13 @@ void showVolume(const Color::Pattern &pattern, float left, float right) {
 	uint16_t leftLedInt = floor(leftLed);
 	float leftLedFrac = leftLed - leftLedInt;
 	for (uint16_t i = 0; i < leftLedInt; i++) {
-		Color::RGB color = pattern.get(i);
-		CRGB temp = { color.red, color.green, color.blue };
+		Color::RGB color = mute ? MUTE_COLOR : pattern.get(i);
+		CRGB temp(color.red, color.green, color.blue);
 		leds[i] = applyGamma_video(temp, LED_GAMMA);
 	}
 	if (leftLedInt < LED_COUNT / 2) {
-		Color::RGB color = pattern.get(leftLedInt);
-		CRGB temp = { leftLedFrac * color.red, leftLedFrac * color.green, leftLedFrac * color.blue };
+		Color::RGB color = mute ? MUTE_COLOR : pattern.get(leftLedInt);
+		CRGB temp(leftLedFrac * color.red, leftLedFrac * color.green, leftLedFrac * color.blue);
 		leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
 	}
 
@@ -120,13 +125,13 @@ void showVolume(const Color::Pattern &pattern, float left, float right) {
 	uint16_t rightLedInt = floor(rightLed);
 	float rightLedFrac = rightLed - rightLedInt;
 	for (uint16_t i = 0; i < rightLedInt; i++) {
-		Color::RGB color = pattern.get(LED_COUNT - 1 - i);
-		CRGB temp = { color.red, color.green, color.blue };
+		Color::RGB color = mute ? MUTE_COLOR : pattern.get(LED_COUNT - 1 - i);
+		CRGB temp(color.red, color.green, color.blue);
 		leds[LED_COUNT - 1 - i] = applyGamma_video(temp, LED_GAMMA);
 	}
 	if (rightLedInt < LED_COUNT / 2) {
-		Color::RGB color = pattern.get(LED_COUNT - 1 - rightLedInt);
-		CRGB temp = { rightLedFrac * color.red, rightLedFrac * color.green, rightLedFrac * color.blue };
+		Color::RGB color = mute ? MUTE_COLOR : pattern.get(LED_COUNT - 1 - rightLedInt);
+		CRGB temp(rightLedFrac * color.red, rightLedFrac * color.green, rightLedFrac * color.blue);
 		leds[LED_COUNT - 1 - rightLedInt] = applyGamma_video(temp, LED_GAMMA);
 	}
 
@@ -143,6 +148,9 @@ void hideVolume() {
 	FastLED.clear(true);
 }
 
+static int16_t master, lf, rf;
+static int8_t mute;
+
 void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	Serial.print(F("Discovered: "));
 	Serial.print(info.name);
@@ -150,56 +158,80 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	Serial.println(info.playerIP);
 
 	String newSID;
-	bool result = eventServer->subscribe([info](String SID, Stream &stream) {
-		int32_t master = -1, lf = -1, rf = -1;
-		XML::extractEncodedTags(stream, "</LastChange>", [&master, &lf, &rf](String tag) -> bool {
 
-					if (!tag.startsWith("<Volume ")) {
-						/* continue tag extraction */
-						return true;
-					}
+	master = -1, lf = -1, rf = -1, mute = -1;
 
-					String channel;
-					if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
-						Serial.println(F("Failed to extract channel attribute from tag"));
-						return false;
-					};
+	bool result = eventServer->subscribe([](String SID, Stream &stream) {
+		XML::extractEncodedTags(stream, "</LastChange>", [](String tag) -> bool {
 
-					String val;
-					if (!XML::extractAttributeValue(tag, F("val"), &val)) {
-						Serial.println(F("Failed to extract val attribute from tag"));
-						return false;
-					};
+					if (tag.startsWith("<Volume ")) {
+						String channel;
+						if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
+							Serial.println(F("Failed to extract channel attribute from tag"));
+							return false;
+						};
 
-					uint16_t volume = 0;
-					for (const char *p = val.c_str(); *p; p++) {
-						if (isdigit(*p)) {
-							volume = 10 * volume + (*p - '0');
+						String val;
+						if (!XML::extractAttributeValue(tag, F("val"), &val)) {
+							Serial.println(F("Failed to extract val attribute from tag"));
+							return false;
+						};
+
+						uint16_t volume = 0;
+						for (const char *p = val.c_str(); *p; p++) {
+							if (isdigit(*p)) {
+								volume = 10 * volume + (*p - '0');
+							} else {
+								Serial.println(F("Found a non-digit in val"));
+								return false;
+							}
+							if (volume > 100) {
+								Serial.println(F("Too large val"));
+								return false;
+							}
+						}
+
+						if (channel == "Master") {
+							master = volume;
+						} else if (channel == "LF") {
+							lf = volume;
+						} else if (channel == "RF") {
+							rf = volume;
+						}
+					} else if (tag.startsWith("<Mute ")) {
+						String channel;
+						if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
+							Serial.println(F("Failed to extract channel attribute from tag"));
+							return false;
+						};
+
+						if (channel != "Master") {
+							/* only Master channel is muted */
+							return true;
+						}
+
+						String val;
+						if (!XML::extractAttributeValue(tag, F("val"), &val)) {
+							Serial.println(F("Failed to extract val attribute from tag"));
+							return false;
+						};
+
+						if (val == "0") {
+							mute = 0;
+						} else if (val == "1") {
+							mute = 1;
 						} else {
-							Serial.println(F("Found a non-digit in val"));
+							Serial.println(F("Invalid boolean val"));
 							return false;
 						}
-						if (volume > 100) {
-							Serial.println(F("Too large val"));
-							return false;
-						}
-					}
-
-					if (channel == "Master") {
-						master = volume;
-					} else if (channel == "LF") {
-						lf = volume;
-					} else if (channel == "RF") {
-						rf = volume;
 					}
 
 					return true;
 				});
 
-		/* TODO keep track of current volume/mute state*/
-		if (master != -1 && lf != -1 && rf != -1) {
-			Serial.printf("%s: Master = %u, LF = %u, RF = %u\r\n", info.name.c_str(), master, lf, rf);
-			showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0);
+		/* show current state */
+		if (master != -1 && lf != -1 && rf != -1 && mute != -1) {
+			showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0, mute);
 			showing = true;
 			showingStartMillis = millis();
 		}
