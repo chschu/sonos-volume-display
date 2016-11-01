@@ -319,18 +319,18 @@ void setup() {
 
 void loop() {
 	// initialize event server if WiFi is (re-)connected
-	if (WiFi.isConnected() && !eventServer) {
+	bool connected = WiFi.isConnected();
+	if (connected && !eventServer) {
 		initializeEventServer();
 		initializeSubscription();
 	}
 	// destroy event server if WiFi disconnected unexpectedly
-	if (!WiFi.isConnected() && eventServer) {
+	if (!connected && eventServer) {
 		// cannot unsubscribe here, because WiFi is not connected
 		destroyEventServer();
 	}
 
 	// disable AP if WiFi is connected, enable AP if WiFi is disconnected
-	bool connected = WiFi.isConnected();
 	WiFiMode_t mode = WiFi.getMode();
 	bool accessPoint = mode == WIFI_AP || mode == WIFI_AP_STA;
 	if (connected == accessPoint) {
