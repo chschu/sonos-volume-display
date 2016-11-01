@@ -151,6 +151,84 @@ void hideVolume() {
 static int16_t master, lf, rf;
 static int8_t mute;
 
+bool renderingControlEventXmlTagCallback(String tag) {
+	if (tag.startsWith("<Volume ")) {
+		String channel;
+		if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
+			Serial.println(F("Failed to extract channel attribute from tag"));
+			return false;
+		};
+
+		String val;
+		if (!XML::extractAttributeValue(tag, F("val"), &val)) {
+			Serial.println(F("Failed to extract val attribute from tag"));
+			return false;
+		};
+
+		uint16_t volume = 0;
+		for (const char *p = val.c_str(); *p; p++) {
+			if (isdigit(*p)) {
+				volume = 10 * volume + (*p - '0');
+			} else {
+				Serial.println(F("Found a non-digit in val"));
+				return false;
+			}
+			if (volume > 100) {
+				Serial.println(F("Too large val"));
+				return false;
+			}
+		}
+
+		if (channel == "Master") {
+			master = volume;
+		} else if (channel == "LF") {
+			lf = volume;
+		} else if (channel == "RF") {
+			rf = volume;
+		}
+	} else if (tag.startsWith("<Mute ")) {
+		String channel;
+		if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
+			Serial.println(F("Failed to extract channel attribute from tag"));
+			return false;
+		};
+
+		if (channel != "Master") {
+			/* only Master channel is muted */
+			return true;
+		}
+
+		String val;
+		if (!XML::extractAttributeValue(tag, F("val"), &val)) {
+			Serial.println(F("Failed to extract val attribute from tag"));
+			return false;
+		};
+
+		if (val == "0") {
+			mute = 0;
+		} else if (val == "1") {
+			mute = 1;
+		} else {
+			Serial.println(F("Invalid boolean val"));
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void renderingControlEventCallback(String SID, Stream &stream) {
+	/* update current state */
+	XML::extractEncodedTags(stream, "</LastChange>", &renderingControlEventXmlTagCallback);
+
+	/* show current state */
+	if (master != -1 && lf != -1 && rf != -1 && mute != -1) {
+		showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0, mute);
+		showing = true;
+		showingStartMillis = millis();
+	}
+}
+
 void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	Serial.print(F("Discovered: "));
 	Serial.print(info.name);
@@ -161,82 +239,8 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 
 	master = -1, lf = -1, rf = -1, mute = -1;
 
-	bool result = eventServer->subscribe([](String SID, Stream &stream) {
-		XML::extractEncodedTags(stream, "</LastChange>", [](String tag) -> bool {
-
-					if (tag.startsWith("<Volume ")) {
-						String channel;
-						if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
-							Serial.println(F("Failed to extract channel attribute from tag"));
-							return false;
-						};
-
-						String val;
-						if (!XML::extractAttributeValue(tag, F("val"), &val)) {
-							Serial.println(F("Failed to extract val attribute from tag"));
-							return false;
-						};
-
-						uint16_t volume = 0;
-						for (const char *p = val.c_str(); *p; p++) {
-							if (isdigit(*p)) {
-								volume = 10 * volume + (*p - '0');
-							} else {
-								Serial.println(F("Found a non-digit in val"));
-								return false;
-							}
-							if (volume > 100) {
-								Serial.println(F("Too large val"));
-								return false;
-							}
-						}
-
-						if (channel == "Master") {
-							master = volume;
-						} else if (channel == "LF") {
-							lf = volume;
-						} else if (channel == "RF") {
-							rf = volume;
-						}
-					} else if (tag.startsWith("<Mute ")) {
-						String channel;
-						if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
-							Serial.println(F("Failed to extract channel attribute from tag"));
-							return false;
-						};
-
-						if (channel != "Master") {
-							/* only Master channel is muted */
-							return true;
-						}
-
-						String val;
-						if (!XML::extractAttributeValue(tag, F("val"), &val)) {
-							Serial.println(F("Failed to extract val attribute from tag"));
-							return false;
-						};
-
-						if (val == "0") {
-							mute = 0;
-						} else if (val == "1") {
-							mute = 1;
-						} else {
-							Serial.println(F("Invalid boolean val"));
-							return false;
-						}
-					}
-
-					return true;
-				});
-
-		/* show current state */
-		if (master != -1 && lf != -1 && rf != -1 && mute != -1) {
-			showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0, mute);
-			showing = true;
-			showingStartMillis = millis();
-		}
-
-	}, "http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
+	bool result = eventServer->subscribe(renderingControlEventCallback,
+			"http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
 
 	if (result) {
 		Serial.print(F("Subscribed with new SID "));
