@@ -320,22 +320,14 @@ void setup() {
 	Color::RGB white = { 255, 255, 255 };
 
 	// initialize color gradient for volume
-	gradient.set(0 * LED_COUNT / 8, green);
-	gradient.set(1 * LED_COUNT / 8 - 1, yellow);
-	gradient.set(1 * LED_COUNT / 8, yellow);
-	gradient.set(2 * LED_COUNT / 8 - 1, red);
-	gradient.set(2 * LED_COUNT / 8, red);
-	gradient.set(3 * LED_COUNT / 8 - 1, magenta);
-	gradient.set(3 * LED_COUNT / 8, magenta);
-	gradient.set(4 * LED_COUNT / 8 - 1, white);
-	gradient.set(4 * LED_COUNT / 8, white);
-	gradient.set(5 * LED_COUNT / 8 - 1, magenta);
-	gradient.set(5 * LED_COUNT / 8, magenta);
-	gradient.set(6 * LED_COUNT / 8 - 1, red);
-	gradient.set(6 * LED_COUNT / 8, red);
-	gradient.set(7 * LED_COUNT / 8 - 1, yellow);
-	gradient.set(7 * LED_COUNT / 8, yellow);
-	gradient.set(8 * LED_COUNT / 8 - 1, green);
+	gradient.set(0 * LED_COUNT / 4, green);
+	gradient.set(1 * LED_COUNT / 4 - 1, yellow);
+	gradient.set(1 * LED_COUNT / 4, yellow);
+	gradient.set(2 * LED_COUNT / 4 - 1, red);
+	gradient.set(2 * LED_COUNT / 4, red);
+	gradient.set(3 * LED_COUNT / 4 - 1, yellow);
+	gradient.set(3 * LED_COUNT / 4, yellow);
+	gradient.set(4 * LED_COUNT / 4 - 1, green);
 
 	// initialize LEDs
 	FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, LED_COUNT);
