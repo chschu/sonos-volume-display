@@ -179,6 +179,13 @@ void EventServer::handleEvent() {
 		String requestLine = client.readStringUntil('\n');
 		if (requestLine != F("NOTIFY / HTTP/1.0\r") && requestLine != F("NOTIFY / HTTP/1.1\r")) {
 			Serial.println(F("invalid request line"));
+			Serial.print("\"");
+			Serial.print(requestLine);
+			Serial.println("\"");
+			Serial.print("available: ");
+			Serial.println(client.available());
+			Serial.print("status: ");
+			Serial.println(client.status());
 			sendBadRequest(client);
 			return;
 		}
