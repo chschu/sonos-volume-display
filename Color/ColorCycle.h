@@ -1,10 +1,3 @@
-/*
- * ColorCycle.h
- *
- *  Created on: 31 Oct 2016
- *      Author: chschu
- */
-
 #ifndef COLOR_COLORCYCLE_H_
 #define COLOR_COLORCYCLE_H_
 

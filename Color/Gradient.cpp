@@ -1,10 +1,3 @@
-/*
- * Gradient.cpp
- *
- *  Created on: 10 Oct 2016
- *      Author: chschu
- */
-
 #include "Gradient.h"
 
 #include <cassert>

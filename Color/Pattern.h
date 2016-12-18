@@ -1,10 +1,3 @@
-/*
- * Pattern.h
- *
- *  Created on: 10 Oct 2016
- *      Author: chschu
- */
-
 #ifndef COLOR_PATTERN_H_
 #define COLOR_PATTERN_H_
 

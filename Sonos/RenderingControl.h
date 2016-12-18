@@ -1,10 +1,3 @@
-/*
- * RenderingControl.h
- *
- *  Created on: 12 Sep 2016
- *      Author: chschu
- */
-
 #ifndef SONOS_RENDERINGCONTROL_H_
 #define SONOS_RENDERINGCONTROL_H_
 

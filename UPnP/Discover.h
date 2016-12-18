@@ -1,10 +1,3 @@
-/*
- * Discover.h
- *
- *  Created on: 10 Sep 2016
- *      Author: chschu
- */
-
 #ifndef UPNP_DISCOVER_H_
 #define UPNP_DISCOVER_H_
 

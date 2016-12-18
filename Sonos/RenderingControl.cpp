@@ -1,10 +1,3 @@
-/*
- * RenderingControl.cpp
- *
- *  Created on: 12 Sep 2016
- *      Author: chschu
- */
-
 #include "RenderingControl.h"
 
 #include <ESP8266HTTPClient.h>

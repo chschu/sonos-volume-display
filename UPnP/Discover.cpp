@@ -1,10 +1,3 @@
-/*
- * Discover.cpp
- *
- *  Created on: 10 Sep 2016
- *      Author: chschu
- */
-
 #include "Discover.h"
 
 #include <Arduino.h>

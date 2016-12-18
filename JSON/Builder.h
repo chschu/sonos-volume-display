@@ -1,10 +1,3 @@
-/*
- * Builder.h
- *
- *  Created on: 3 Oct 2016
- *      Author: chschu
- */
-
 #ifndef JSON_BUILDER_H_
 #define JSON_BUILDER_H_
 

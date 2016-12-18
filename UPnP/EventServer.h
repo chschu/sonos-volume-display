@@ -1,10 +1,3 @@
-/*
- * EventServer.h
- *
- *  Created on: 19 Sep 2016
- *      Author: chschu
- */
-
 #ifndef UPNP_EVENTSERVER_H_
 #define UPNP_EVENTSERVER_H_
 

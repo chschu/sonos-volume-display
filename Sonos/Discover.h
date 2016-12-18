@@ -1,10 +1,3 @@
-/*
- * Discover.h
- *
- *  Created on: 10 Sep 2016
- *      Author: chschu
- */
-
 #ifndef SONOS_DISCOVER_H_
 #define SONOS_DISCOVER_H_
 

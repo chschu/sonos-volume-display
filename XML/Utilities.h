@@ -1,10 +1,3 @@
-/*
- * Utilities.h
- *
- *  Created on: 19 Sep 2016
- *      Author: chschu
- */
-
 #ifndef XML_UTILITIES_H_
 #define XML_UTILITIES_H_
 

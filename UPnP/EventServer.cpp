@@ -1,10 +1,3 @@
-/*
- * EventServer.cpp
- *
- *  Created on: 19 Sep 2016
- *      Author: chschu
- */
-
 #include "EventServer.h"
 
 #include <Arduino.h>

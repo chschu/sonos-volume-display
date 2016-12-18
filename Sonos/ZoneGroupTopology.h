@@ -1,10 +1,3 @@
-/*
- * ZoneGroupTopology.h
- *
- *  Created on: 12 Sep 2016
- *      Author: chschu
- */
-
 #ifndef SONOS_ZONEGROUPTOPOLOGY_H_
 #define SONOS_ZONEGROUPTOPOLOGY_H_
 

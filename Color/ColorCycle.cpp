@@ -1,10 +1,3 @@
-/*
- * ColorCycle.cpp
- *
- *  Created on: 31 Oct 2016
- *      Author: chschu
- */
-
 #include "ColorCycle.h"
 
 #include <Arduino.h>

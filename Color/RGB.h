@@ -1,10 +1,3 @@
-/*
- * RGB.h
- *
- *  Created on: 10 Oct 2016
- *      Author: chschu
- */
-
 #ifndef COLOR_RGB_H_
 #define COLOR_RGB_H_
 

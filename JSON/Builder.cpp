@@ -1,10 +1,3 @@
-/*
- * Builder.cpp
- *
- *  Created on: 3 Oct 2016
- *      Author: chschu
- */
-
 #include "Builder.h"
 
 #include <pgmspace.h>

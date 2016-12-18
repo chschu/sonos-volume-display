@@ -1,10 +1,3 @@
-/*
- * Persistent.cpp
- *
- *  Created on: 22 Oct 2016
- *      Author: chschu
- */
-
 #include "Persistent.h"
 
 #include <EEPROM.h>

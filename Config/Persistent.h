@@ -1,10 +1,3 @@
-/*
- * Persistent.h
- *
- *  Created on: 22 Oct 2016
- *      Author: chschu
- */
-
 #ifndef CONFIG_PERSISTENT_H_
 #define CONFIG_PERSISTENT_H_
 

@@ -1,10 +1,3 @@
-/*
- * Server.h
- *
- *  Created on: 30 Sep 2016
- *      Author: chschu
- */
-
 #ifndef CONFIG_SERVER_H_
 #define CONFIG_SERVER_H_
 

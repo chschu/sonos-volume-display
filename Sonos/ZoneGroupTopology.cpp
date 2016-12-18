@@ -1,10 +1,3 @@
-/*
- * ZoneGroupTopology.cpp
- *
- *  Created on: 12 Sep 2016
- *      Author: chschu
- */
-
 #include "ZoneGroupTopology.h"
 
 #include <ESP8266HTTPClient.h>

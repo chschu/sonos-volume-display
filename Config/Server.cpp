@@ -1,10 +1,3 @@
-/*
- * Server.cpp
- *
- *  Created on: 30 Sep 2016
- *      Author: chschu
- */
-
 #include "Server.h"
 
 #include <ESP8266WiFi.h>

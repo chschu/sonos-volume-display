@@ -1,10 +1,3 @@
-/*
- * Gradient.h
- *
- *  Created on: 10 Oct 2016
- *      Author: chschu
- */
-
 #ifndef COLOR_GRADIENT_H_
 #define COLOR_GRADIENT_H_
 
