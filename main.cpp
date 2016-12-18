@@ -93,6 +93,11 @@ void setReady(bool value) {
 	}
 }
 
+// apply a transformation to get better resolution in the low volume range
+float transformValue(float x) {
+	return 1.0 - pow(1.0 - x, 2.0);
+}
+
 void showVolume(const Color::Pattern &pattern, float left, float right, bool mute) {
 	if (!ready) {
 		return;
@@ -107,7 +112,7 @@ void showVolume(const Color::Pattern &pattern, float left, float right, bool mut
 
 	FastLED.clear();
 
-	float leftLed = LED_COUNT / 2 * left;
+	float leftLed = LED_COUNT / 2 * transformValue(left);
 	uint16_t leftLedInt = floor(leftLed);
 	float leftLedFrac = leftLed - leftLedInt;
 	for (uint16_t i = 0; i < leftLedInt; i++) {
@@ -121,7 +126,7 @@ void showVolume(const Color::Pattern &pattern, float left, float right, bool mut
 		leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
 	}
 
-	float rightLed = LED_COUNT / 2 * right;
+	float rightLed = LED_COUNT / 2 * transformValue(right);
 	uint16_t rightLedInt = floor(rightLed);
 	float rightLedFrac = rightLed - rightLedInt;
 	for (uint16_t i = 0; i < rightLedInt; i++) {
