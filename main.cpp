@@ -153,6 +153,7 @@ void hideVolume() {
 	FastLED.clear(true);
 }
 
+static bool changed;
 static int16_t master, lf, rf;
 static int8_t mute;
 
@@ -185,10 +186,13 @@ bool renderingControlEventXmlTagCallback(String tag) {
 		}
 
 		if (channel == "Master") {
+			changed |= volume != master;
 			master = volume;
 		} else if (channel == "LF") {
+			changed |= volume != lf;
 			lf = volume;
 		} else if (channel == "RF") {
+			changed |= volume != rf;
 			rf = volume;
 		}
 	} else if (tag.startsWith("<Mute ")) {
@@ -210,8 +214,10 @@ bool renderingControlEventXmlTagCallback(String tag) {
 		};
 
 		if (val == "0") {
+			changed |= mute != 0;
 			mute = 0;
 		} else if (val == "1") {
+			changed |= mute != 1;
 			mute = 1;
 		} else {
 			Serial.println(F("Invalid boolean val"));
@@ -223,11 +229,13 @@ bool renderingControlEventXmlTagCallback(String tag) {
 }
 
 void renderingControlEventCallback(String SID, Stream &stream) {
+	changed = false;
+
 	/* update current state */
 	XML::extractEncodedTags(stream, "</LastChange>", &renderingControlEventXmlTagCallback);
 
 	/* show current state */
-	if (master != -1 && lf != -1 && rf != -1 && mute != -1) {
+	if (changed && master != -1 && lf != -1 && rf != -1 && mute != -1) {
 		showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0, mute);
 		showing = true;
 		showingStartMillis = millis();
