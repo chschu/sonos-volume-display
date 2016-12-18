@@ -57,7 +57,11 @@ const uint16_t COLOR_CYCLE_LENGTH = 57;
 const Color::ColorCycle COLOR_CYCLE(COLOR_CYCLE_LENGTH, 0, COLOR_CYCLE_LENGTH / 3, 2 * COLOR_CYCLE_LENGTH / 3);
 uint16_t colorCycleOffset;
 
-bool showing;
+typedef enum {
+	DS_HIDE, DS_SHOW_TEMPORARY, DS_SHOW_PERMANENT
+} DisplayState;
+
+DisplayState displayState;
 unsigned long showingStartMillis = 0;
 bool ready = false;
 bool initialized = false;
@@ -237,7 +241,7 @@ void renderingControlEventCallback(String SID, Stream &stream) {
 	/* show current state */
 	if (changed && master != -1 && lf != -1 && rf != -1 && mute != -1) {
 		showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0, mute);
-		showing = true;
+		displayState = mute ? DS_SHOW_PERMANENT : DS_SHOW_TEMPORARY;
 		showingStartMillis = millis();
 	}
 }
@@ -385,8 +389,8 @@ void loop() {
 	}
 	configServer.handleClient();
 
-	if (showing && millis() - showingStartMillis > 2000) {
+	if (displayState == DS_SHOW_TEMPORARY && millis() - showingStartMillis > 2000) {
 		hideVolume();
-		showing = false;
+		displayState = DS_HIDE;
 	}
 }
