@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <cassert>
 #include <cstring>
+#include <functional>
 
 #include "Color/ColorCycle.h"
 #include "Color/Gradient.h"
@@ -44,6 +45,9 @@ const CRGB LED_TEMPERATURE = Tungsten100W;
 const uint8_t LED_BRIGHTNESS = 255;
 const float LED_GAMMA = 2.2;
 
+// transformation to apply to volume values; input in [0,1], output in [0,1]
+const std::function<float(float)> DISPLAY_TRANSFORMATION = [](float x) -> float {return 1.0 - pow(1.0 - x, 2.0);};
+
 Config::PersistentConfig config;
 Config::Server configServer(config);
 UPnP::EventServer *eventServer = NULL;
@@ -59,81 +63,18 @@ const uint16_t COLOR_CYCLE_LENGTH = 57;
 const Color::ColorCycle COLOR_CYCLE(COLOR_CYCLE_LENGTH, 0, COLOR_CYCLE_LENGTH / 3, 2 * COLOR_CYCLE_LENGTH / 3);
 
 typedef enum {
-	DS_HIDE, DS_SHOW_TEMPORARY, DS_SHOW_PERMANENT
+	DS_COLOR_CYCLE, DS_HIDE, DS_SHOW_TEMPORARY, DS_SHOW_PERMANENT
 } DisplayState;
 
-DisplayState displayState = DS_HIDE;
+DisplayState displayState = DS_COLOR_CYCLE;
 
-// false -> color cycle is displayed; true -> volume events are displayed
-bool ready = false;
+Ticker displayUpdateTicker;
 
-Ticker colorCycleTicker;
-
-unsigned long showingStartMillis = 0;
-
-// apply a transformation to get better resolution in the low volume range
-float transformValue(float x) {
-	return 1.0 - pow(1.0 - x, 2.0);
-}
-
-void showVolume(const Color::Pattern &pattern, float left, float right, bool mute) {
-	if (!ready) {
-		return;
-	}
-
-	Serial.print(F("showing left="));
-	Serial.print(left);
-	Serial.print(", right=");
-	Serial.print(right);
-	Serial.print(", mute=");
-	Serial.println(mute);
-
-	FastLED.clear();
-
-	float leftLed = LED_COUNT / 2 * transformValue(left);
-	uint16_t leftLedInt = floor(leftLed);
-	float leftLedFrac = leftLed - leftLedInt;
-	for (uint16_t i = 0; i < leftLedInt; i++) {
-		Color::RGB color = mute ? MUTE_COLOR : pattern.get(i);
-		CRGB temp(color.red, color.green, color.blue);
-		leds[i] = applyGamma_video(temp, LED_GAMMA);
-	}
-	if (leftLedInt < LED_COUNT / 2) {
-		Color::RGB color = mute ? MUTE_COLOR : pattern.get(leftLedInt);
-		CRGB temp(leftLedFrac * color.red, leftLedFrac * color.green, leftLedFrac * color.blue);
-		leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
-	}
-
-	float rightLed = LED_COUNT / 2 * transformValue(right);
-	uint16_t rightLedInt = floor(rightLed);
-	float rightLedFrac = rightLed - rightLedInt;
-	for (uint16_t i = 0; i < rightLedInt; i++) {
-		Color::RGB color = mute ? MUTE_COLOR : pattern.get(LED_COUNT - 1 - i);
-		CRGB temp(color.red, color.green, color.blue);
-		leds[LED_COUNT - 1 - i] = applyGamma_video(temp, LED_GAMMA);
-	}
-	if (rightLedInt < LED_COUNT / 2) {
-		Color::RGB color = mute ? MUTE_COLOR : pattern.get(LED_COUNT - 1 - rightLedInt);
-		CRGB temp(rightLedFrac * color.red, rightLedFrac * color.green, rightLedFrac * color.blue);
-		leds[LED_COUNT - 1 - rightLedInt] = applyGamma_video(temp, LED_GAMMA);
-	}
-
-	FastLED.show();
-}
-
-void hideVolume() {
-	if (!ready) {
-		return;
-	}
-
-	Serial.println(F("hiding"));
-
-	FastLED.clear(true);
-}
+unsigned long lastUpdate = 0;
 
 static bool changed;
 static int16_t master, lf, rf;
-static int8_t mute;
+static bool mute;
 
 bool renderingControlEventXmlTagCallback(String tag) {
 	if (tag.startsWith("<Volume ")) {
@@ -192,11 +133,11 @@ bool renderingControlEventXmlTagCallback(String tag) {
 		};
 
 		if (val == "0") {
-			changed |= mute != 0;
-			mute = 0;
+			changed |= mute;
+			mute = false;
 		} else if (val == "1") {
-			changed |= mute != 1;
-			mute = 1;
+			changed |= !mute;
+			mute = true;
 		} else {
 			Serial.println(F("Invalid boolean val"));
 			return false;
@@ -214,9 +155,8 @@ void renderingControlEventCallback(String SID, Stream &stream) {
 
 	/* show current state */
 	if (changed && master != -1 && lf != -1 && rf != -1 && mute != -1) {
-		showVolume(gradient, master * lf / 10000.0, master * rf / 10000.0, mute);
 		displayState = mute ? DS_SHOW_PERMANENT : DS_SHOW_TEMPORARY;
-		showingStartMillis = millis();
+		lastUpdate = millis();
 	}
 }
 
@@ -236,7 +176,7 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	if (result) {
 		Serial.print(F("Subscribed with new SID "));
 		Serial.println(newSID);
-		ready = true;
+		displayState = DS_HIDE;
 	} else {
 		Serial.print(F("Subscription failed"));
 	}
@@ -280,7 +220,7 @@ void initializeSubscription() {
 }
 
 void destroySubscription() {
-	ready = false;
+	displayState = DS_COLOR_CYCLE;
 
 	if (eventServer) {
 		eventServer->unsubscribeAll();
@@ -298,7 +238,7 @@ void initializeEventServer() {
 }
 
 void destroyEventServer() {
-	ready = false;
+	displayState = DS_COLOR_CYCLE;
 
 	if (eventServer) {
 		Serial.println("destroying EventServer on WiFi disconnect");
@@ -308,41 +248,79 @@ void destroyEventServer() {
 	}
 }
 
-void colorCycleTickerCallback() {
+void updateDisplay() {
 	static int16_t colorCycleOffset = -1;
 	static uint16_t ledOffset;
 
-	if (ready) {
-		// reset color cycle
-		colorCycleOffset = -1;
-		return;
-	}
-
-	if (colorCycleOffset < 0) {
-		// initialize color cycle
-		for (int i = 0; i < LED_COUNT; i++) {
-			leds[i] = CRGB::Black;
-		}
-		ledOffset = 0;
-		colorCycleOffset = 0;
+	if (displayState == DS_SHOW_TEMPORARY && millis() - lastUpdate > 2000) {
 		displayState = DS_HIDE;
 	}
 
-	// update LEDs
-	for (int i = 0; i < LED_COUNT; i++) {
-		leds[i] = leds[i].fadeToBlackBy(20);
-	}
-	Color::RGB color = COLOR_CYCLE.get(colorCycleOffset);
-	leds[ledOffset] = applyGamma_video(CRGB(color.red, color.green, color.blue), LED_GAMMA);
-	FastLED.show();
+	if (displayState == DS_COLOR_CYCLE) {
+		if (colorCycleOffset < 0) {
+			// initialize color cycle
+			for (int i = 0; i < LED_COUNT; i++) {
+				leds[i] = CRGB::Black;
+			}
+			ledOffset = 0;
+			colorCycleOffset = 0;
+		}
 
-	// update offsets
-	if (++ledOffset == LED_COUNT) {
-		ledOffset = 0;
+		// update LEDs
+		for (int i = 0; i < LED_COUNT; i++) {
+			leds[i] = leds[i].fadeToBlackBy(20);
+		}
+		Color::RGB color = COLOR_CYCLE.get(colorCycleOffset);
+		leds[ledOffset] = applyGamma_video(CRGB(color.red, color.green, color.blue), LED_GAMMA);
+
+		// update offsets
+		if (++ledOffset == LED_COUNT) {
+			ledOffset = 0;
+		}
+		if (++colorCycleOffset == COLOR_CYCLE_LENGTH) {
+			colorCycleOffset = 0;
+		}
+	} else if (displayState == DS_HIDE) {
+		colorCycleOffset = -1;
+		FastLED.clear();
+	} else if (displayState == DS_SHOW_TEMPORARY || displayState == DS_SHOW_PERMANENT) {
+		colorCycleOffset = -1;
+
+		FastLED.clear();
+
+		float leftLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(master * lf / 10000.0);
+		uint16_t leftLedInt = floor(leftLed);
+		float leftLedFrac = leftLed - leftLedInt;
+		for (uint16_t i = 0; i < leftLedInt; i++) {
+			Color::RGB color = mute ? MUTE_COLOR : gradient.get(i);
+			CRGB temp(color.red, color.green, color.blue);
+			leds[i] = applyGamma_video(temp, LED_GAMMA);
+		}
+		if (leftLedInt < LED_COUNT / 2) {
+			Color::RGB color = mute ? MUTE_COLOR : gradient.get(leftLedInt);
+			CRGB temp(leftLedFrac * color.red, leftLedFrac * color.green, leftLedFrac * color.blue);
+			leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
+		}
+
+		float rightLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(master * rf / 10000.0);
+		uint16_t rightLedInt = floor(rightLed);
+		float rightLedFrac = rightLed - rightLedInt;
+		for (uint16_t i = 0; i < rightLedInt; i++) {
+			Color::RGB color = mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - i);
+			CRGB temp(color.red, color.green, color.blue);
+			leds[LED_COUNT - 1 - i] = applyGamma_video(temp, LED_GAMMA);
+		}
+		if (rightLedInt < LED_COUNT / 2) {
+			Color::RGB color = mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - rightLedInt);
+			CRGB temp(rightLedFrac * color.red, rightLedFrac * color.green, rightLedFrac * color.blue);
+			leds[LED_COUNT - 1 - rightLedInt] = applyGamma_video(temp, LED_GAMMA);
+		}
+	} else {
+		Serial.print(F("unknown display state: "));
+		Serial.println(displayState);
 	}
-	if (++colorCycleOffset == COLOR_CYCLE_LENGTH) {
-		colorCycleOffset = 0;
-	}
+
+	FastLED.show();
 }
 
 void setup() {
@@ -371,8 +349,8 @@ void setup() {
 	FastLED.setTemperature(LED_TEMPERATURE);
 	FastLED.setBrightness(LED_BRIGHTNESS);
 
-	// show color cycle until event subscription is ready
-	colorCycleTicker.attach_ms(40, colorCycleTickerCallback);
+	// start display update ticker
+	displayUpdateTicker.attach_ms(40, updateDisplay);
 
 	// load configuration from EEPROM
 	config.load();
@@ -414,9 +392,4 @@ void loop() {
 		eventServer->handleEvent();
 	}
 	configServer.handleClient();
-
-	if (displayState == DS_SHOW_TEMPORARY && millis() - showingStartMillis > 2000) {
-		hideVolume();
-		displayState = DS_HIDE;
-	}
 }
