@@ -57,47 +57,19 @@ const Color::RGB MUTE_COLOR = { 0, 0, 63 };
 // rainbow cycle for startup animation
 const uint16_t COLOR_CYCLE_LENGTH = 57;
 const Color::ColorCycle COLOR_CYCLE(COLOR_CYCLE_LENGTH, 0, COLOR_CYCLE_LENGTH / 3, 2 * COLOR_CYCLE_LENGTH / 3);
-uint16_t colorCycleOffset;
 
 typedef enum {
 	DS_HIDE, DS_SHOW_TEMPORARY, DS_SHOW_PERMANENT
 } DisplayState;
 
-DisplayState displayState;
-unsigned long showingStartMillis = 0;
-bool ready = false;
-bool initialized = false;
-uint16_t ledOffset;
-Ticker ticker;
+DisplayState displayState = DS_HIDE;
 
-void setReady(bool value) {
-	if (!initialized || (value != ready)) {
-		if (!value) {
-			FastLED.clear();
-			ledOffset = 0;
-			colorCycleOffset = 0;
-			ticker.attach_ms(40, []() {
-				for (int i = 0; i < LED_COUNT; i++) {
-					leds[i] = leds[i].fadeToBlackBy(20);
-				}
-				Color::RGB color = COLOR_CYCLE.get(colorCycleOffset);
-				leds[ledOffset] = applyGamma_video(CRGB(color.red, color.green, color.blue), LED_GAMMA);
-				if (++ledOffset == LED_COUNT) {
-					ledOffset = 0;
-				}
-				if (++colorCycleOffset == COLOR_CYCLE_LENGTH) {
-					colorCycleOffset = 0;
-				}
-				FastLED.show();
-			});
-		} else {
-			ticker.detach();
-			FastLED.clear(true);
-		}
-		ready = value;
-		initialized = true;
-	}
-}
+// false -> color cycle is displayed; true -> volume events are displayed
+bool ready = false;
+
+Ticker colorCycleTicker;
+
+unsigned long showingStartMillis = 0;
 
 // apply a transformation to get better resolution in the low volume range
 float transformValue(float x) {
@@ -264,7 +236,7 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	if (result) {
 		Serial.print(F("Subscribed with new SID "));
 		Serial.println(newSID);
-		setReady(true);
+		ready = true;
 	} else {
 		Serial.print(F("Subscription failed"));
 	}
@@ -290,9 +262,7 @@ void connectWiFi() {
 
 void initializeSubscription() {
 	const Config::SonosConfig &sonosConfig = config.sonos();
-	if (!sonosConfig.active()) {
-		setReady(true);
-	} else if (eventServer) {
+	if (sonosConfig.active() && eventServer) {
 		Sonos::Discover discover;
 		IPAddress addr;
 		if (discover.discoverAny(&addr)) {
@@ -310,7 +280,7 @@ void initializeSubscription() {
 }
 
 void destroySubscription() {
-	setReady(false);
+	ready = false;
 
 	if (eventServer) {
 		eventServer->unsubscribeAll();
@@ -328,7 +298,7 @@ void initializeEventServer() {
 }
 
 void destroyEventServer() {
-	setReady(false);
+	ready = false;
 
 	if (eventServer) {
 		Serial.println("destroying EventServer on WiFi disconnect");
@@ -338,17 +308,45 @@ void destroyEventServer() {
 	}
 }
 
+void colorCycleTickerCallback() {
+	static int16_t colorCycleOffset = -1;
+	static uint16_t ledOffset;
+
+	if (ready) {
+		// reset color cycle
+		colorCycleOffset = -1;
+		return;
+	}
+
+	if (colorCycleOffset < 0) {
+		// initialize color cycle
+		for (int i = 0; i < LED_COUNT; i++) {
+			leds[i] = CRGB::Black;
+		}
+		ledOffset = 0;
+		colorCycleOffset = 0;
+		displayState = DS_HIDE;
+	}
+
+	// update LEDs
+	for (int i = 0; i < LED_COUNT; i++) {
+		leds[i] = leds[i].fadeToBlackBy(20);
+	}
+	Color::RGB color = COLOR_CYCLE.get(colorCycleOffset);
+	leds[ledOffset] = applyGamma_video(CRGB(color.red, color.green, color.blue), LED_GAMMA);
+	FastLED.show();
+
+	// update offsets
+	if (++ledOffset == LED_COUNT) {
+		ledOffset = 0;
+	}
+	if (++colorCycleOffset == COLOR_CYCLE_LENGTH) {
+		colorCycleOffset = 0;
+	}
+}
+
 void setup() {
 	Serial.begin(115200);
-	delay(500);
-
-	setReady(false);
-
-	// load configuration from EEPROM
-	config.load();
-
-	// enable WiFi and start connecting
-	connectWiFi();
 
 	// prepare colors for gradient
 	Color::RGB red = { 255, 0, 0 };
@@ -372,6 +370,15 @@ void setup() {
 	FastLED.setCorrection(LED_CORRECTION);
 	FastLED.setTemperature(LED_TEMPERATURE);
 	FastLED.setBrightness(LED_BRIGHTNESS);
+
+	// show color cycle until event subscription is ready
+	colorCycleTicker.attach_ms(40, colorCycleTickerCallback);
+
+	// load configuration from EEPROM
+	config.load();
+
+	// enable WiFi and start connecting
+	connectWiFi();
 
 	// start web server for configuration
 	configServer.onBeforeNetworkConfigChange(destroyEventServer);
