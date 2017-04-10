@@ -72,11 +72,25 @@ Ticker displayUpdateTicker;
 
 unsigned long lastUpdate = 0;
 
-static bool changed;
-static int16_t master, lf, rf;
-static bool mute;
+typedef struct VolumeState {
+	int8_t master, lf, rf, mute;
 
-bool renderingControlEventXmlTagCallback(String tag) {
+	void reset() {
+		master = lf = rf = mute = -1;
+	}
+
+	bool complete() {
+		return master != -1 && lf != -1 && rf != -1 && mute != -1;
+	}
+
+	bool operator!=(const VolumeState &other) const {
+		return master != other.master || lf != other.lf || rf != other.rf || mute != other.mute;
+	}
+};
+
+VolumeState current;
+
+bool renderingControlEventXmlTagCallback(String tag, VolumeState &volumeState) {
 	if (tag.startsWith("<Volume ")) {
 		String channel;
 		if (!XML::extractAttributeValue(tag, F("channel"), &channel)) {
@@ -105,14 +119,11 @@ bool renderingControlEventXmlTagCallback(String tag) {
 		}
 
 		if (channel == "Master") {
-			changed |= volume != master;
-			master = volume;
+			volumeState.master = volume;
 		} else if (channel == "LF") {
-			changed |= volume != lf;
-			lf = volume;
+			volumeState.lf = volume;
 		} else if (channel == "RF") {
-			changed |= volume != rf;
-			rf = volume;
+			volumeState.rf = volume;
 		}
 	} else if (tag.startsWith("<Mute ")) {
 		String channel;
@@ -133,11 +144,9 @@ bool renderingControlEventXmlTagCallback(String tag) {
 		};
 
 		if (val == "0") {
-			changed |= mute;
-			mute = false;
+			volumeState.mute = 0;
 		} else if (val == "1") {
-			changed |= !mute;
-			mute = true;
+			volumeState.mute = 1;
 		} else {
 			Serial.println(F("Invalid boolean val"));
 			return false;
@@ -148,15 +157,23 @@ bool renderingControlEventXmlTagCallback(String tag) {
 }
 
 void renderingControlEventCallback(String SID, Stream &stream) {
-	changed = false;
+	// copy current state
+	VolumeState next = current;
 
-	/* update current state */
-	XML::extractEncodedTags(stream, "</LastChange>", &renderingControlEventXmlTagCallback);
+	// update current state
+	XML::extractEncodedTags<VolumeState &>(stream, "</LastChange>", &renderingControlEventXmlTagCallback, next);
 
-	/* show current state */
-	if (changed && master != -1 && lf != -1 && rf != -1 && mute != -1) {
-		displayState = mute ? DS_SHOW_PERMANENT : DS_SHOW_TEMPORARY;
-		lastUpdate = millis();
+	// check for changes
+	if (next != current) {
+		// copy changes to current state
+		current = next;
+
+		// show if all attributes are valid
+		if (current.complete()) {
+			Serial.printf("master=%u, lf=%u, rf=%u, mute=%u\r\n", current.master, current.lf, current.rf, current.mute);
+			displayState = current.mute ? DS_SHOW_PERMANENT : DS_SHOW_TEMPORARY;
+			lastUpdate = millis();
+		}
 	}
 }
 
@@ -168,7 +185,8 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 
 	String newSID;
 
-	master = -1, lf = -1, rf = -1, mute = -1;
+	// reset current state
+	current.reset();
 
 	bool result = eventServer->subscribe(renderingControlEventCallback,
 			"http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
@@ -178,7 +196,7 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 		Serial.println(newSID);
 		displayState = DS_HIDE;
 	} else {
-		Serial.print(F("Subscription failed"));
+		Serial.println(F("Subscription failed"));
 	}
 }
 
@@ -201,6 +219,8 @@ void connectWiFi() {
 }
 
 void initializeSubscription() {
+	displayState = DS_COLOR_CYCLE;
+
 	const Config::SonosConfig &sonosConfig = config.sonos();
 	if (sonosConfig.active() && eventServer) {
 		Sonos::Discover discover;
@@ -288,30 +308,30 @@ void updateDisplay() {
 
 		FastLED.clear();
 
-		float leftLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(master * lf / 10000.0);
+		float leftLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(current.master * current.lf / 10000.0);
 		uint16_t leftLedInt = floor(leftLed);
 		float leftLedFrac = leftLed - leftLedInt;
 		for (uint16_t i = 0; i < leftLedInt; i++) {
-			Color::RGB color = mute ? MUTE_COLOR : gradient.get(i);
+			Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(i);
 			CRGB temp(color.red, color.green, color.blue);
 			leds[i] = applyGamma_video(temp, LED_GAMMA);
 		}
 		if (leftLedInt < LED_COUNT / 2) {
-			Color::RGB color = mute ? MUTE_COLOR : gradient.get(leftLedInt);
+			Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(leftLedInt);
 			CRGB temp(leftLedFrac * color.red, leftLedFrac * color.green, leftLedFrac * color.blue);
 			leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
 		}
 
-		float rightLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(master * rf / 10000.0);
+		float rightLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(current.master * current.rf / 10000.0);
 		uint16_t rightLedInt = floor(rightLed);
 		float rightLedFrac = rightLed - rightLedInt;
 		for (uint16_t i = 0; i < rightLedInt; i++) {
-			Color::RGB color = mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - i);
+			Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - i);
 			CRGB temp(color.red, color.green, color.blue);
 			leds[LED_COUNT - 1 - i] = applyGamma_video(temp, LED_GAMMA);
 		}
 		if (rightLedInt < LED_COUNT / 2) {
-			Color::RGB color = mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - rightLedInt);
+			Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - rightLedInt);
 			CRGB temp(rightLedFrac * color.red, rightLedFrac * color.green, rightLedFrac * color.blue);
 			leds[LED_COUNT - 1 - rightLedInt] = applyGamma_video(temp, LED_GAMMA);
 		}

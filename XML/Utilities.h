@@ -17,7 +17,9 @@ static void replaceEntities(String &s) {
 	s.replace(F("&amp;"), F("&"));
 }
 
-static bool extractEncodedTags(Stream &stream, const char *terminator, std::function<bool(String tag)> callback) {
+template<typename T>
+static bool extractEncodedTags(Stream &stream, const char *terminator,
+		std::function<bool(String tag, T userInfo)> callback, T userInfo) {
 	// skip everything up to (and including) the next &lt;
 	while (stream.findUntil("&lt;", terminator)) {
 		String tag = "&lt;";
@@ -30,7 +32,7 @@ static bool extractEncodedTags(Stream &stream, const char *terminator, std::func
 			if (!endMarkerCh) {
 				// tag is complete, replace the XML entities
 				replaceEntities(tag);
-				if (!callback(tag)) {
+				if (!callback(tag, userInfo)) {
 					Serial.println(F("Callback returned false"));
 					return false;
 				}
@@ -59,6 +61,12 @@ static bool extractEncodedTags(Stream &stream, const char *terminator, std::func
 	}
 
 	return true;
+}
+
+static bool extractEncodedTags(Stream &stream, const char *terminator, std::function<bool(String tag)> callback) {
+	return extractEncodedTags<int>(stream, terminator, [&callback](String tag, int) -> bool {
+		return callback(tag);
+	}, 0);
 }
 
 static bool extractAttributeValue(String tag, String attributeName, String *attributeValue) {
