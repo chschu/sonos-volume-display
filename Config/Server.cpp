@@ -9,25 +9,25 @@
 #include "../JSON/Builder.h"
 #include "../Sonos/Discover.h"
 #include "../Sonos/ZoneGroupTopology.h"
-#include "Persistent.h"
+#include "PersistentConfig.h"
 
 namespace Config {
 
-Server::Server(Persistent &config, IPAddress addr, uint16_t port) :
+Server::Server(PersistentConfig &config, IPAddress addr, uint16_t port) :
 		_config(config), _server(addr, port) {
 }
 
-Server::Server(Persistent &config, uint16_t port) :
+Server::Server(PersistentConfig &config, uint16_t port) :
 		_config(config), _server(port) {
 }
 
 void Server::begin() {
 	_server.on("/api/discover/networks", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverNetworks, this));
 	_server.on("/api/discover/rooms", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverRooms, this));
-	_server.on("/api/network", HTTP_GET, std::bind(&Server::_handleGetApiNetwork, this));
-	_server.on("/api/network", HTTP_POST, std::bind(&Server::_handlePostApiNetwork, this));
-	_server.on("/api/config", HTTP_GET, std::bind(&Server::_handleGetApiConfig, this));
-	_server.on("/api/config", HTTP_POST, std::bind(&Server::_handlePostApiConfig, this));
+	_server.on("/api/config/network", HTTP_GET, std::bind(&Server::_handleGetApiConfigNetwork, this));
+	_server.on("/api/config/network", HTTP_POST, std::bind(&Server::_handlePostApiConfigNetwork, this));
+	_server.on("/api/config/sonos", HTTP_GET, std::bind(&Server::_handleGetApiConfigSonos, this));
+	_server.on("/api/config/sonos", HTTP_POST, std::bind(&Server::_handlePostApiConfigSonos, this));
 	_server.begin();
 }
 
@@ -101,7 +101,7 @@ void Server::_handleGetApiDiscoverRooms() {
 	}
 }
 
-void Server::_handleGetApiNetwork() {
+void Server::_handleGetApiConfigNetwork() {
 	JSON::Builder json;
 	json.beginObject();
 	if (WiFi.isConnected()) {
@@ -117,7 +117,7 @@ void Server::_handleGetApiNetwork() {
 	_server.send(200, F("application/json; charset=utf-8"), json.toString());
 }
 
-void Server::_handlePostApiNetwork() {
+void Server::_handlePostApiConfigNetwork() {
 	String ssid = _server.arg(F("ssid"));
 	String passphrase = _server.arg(F("passphrase"));
 	if (ssid.length()) {
@@ -144,16 +144,20 @@ void Server::_handlePostApiNetwork() {
 	}
 }
 
-void Server::_handleGetApiConfig() {
+void Server::_handleGetApiConfigSonos() {
+	SonosConfig sonosConfig = _config.sonos();
+
 	JSON::Builder json;
 	json.beginObject();
-	json.attribute(F("active"), _config.active() ? F("true") : F("false"));
-	json.attribute(F("room-uuid"), _config.roomUUID());
+	json.attribute(F("active"), sonosConfig.active() ? F("true") : F("false"));
+	json.attribute(F("room-uuid"), sonosConfig.roomUUID());
 	json.endObject();
 	_server.send(200, F("application/json; charset=utf-8"), json.toString());
 }
 
-void Server::_handlePostApiConfig() {
+void Server::_handlePostApiConfigSonos() {
+	SonosConfig sonosConfig = _config.sonos();
+
 	bool active;
 	String roomUUID;
 
@@ -167,22 +171,22 @@ void Server::_handlePostApiConfig() {
 			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
 			return;
 		}
-		if (!_config.setActive(active, true)) {
+		if (!sonosConfig.setActive(active, true)) {
 			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
 			return;
 		}
 	} else {
-		active = _config.active();
+		active = sonosConfig.active();
 	}
 
 	if (_server.hasArg(F("room-uuid"))) {
 		roomUUID = _server.arg(F("room-uuid"));
-		if (!_config.setRoomUUID(roomUUID.c_str(), true)) {
+		if (!sonosConfig.setRoomUUID(roomUUID.c_str(), true)) {
 			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
 			return;
 		}
 	} else {
-		roomUUID = _config.roomUUID();
+		roomUUID = sonosConfig.roomUUID();
 	}
 
 	JSON::Builder json;
@@ -193,8 +197,8 @@ void Server::_handlePostApiConfig() {
 		_beforeConfigurationChangeCallback();
 	}
 
-	_config.setActive(active);
-	_config.setRoomUUID(roomUUID.c_str());
+	sonosConfig.setActive(active);
+	sonosConfig.setRoomUUID(roomUUID.c_str());
 	_config.save();
 
 	if (_afterConfigurationChangeCallback) {

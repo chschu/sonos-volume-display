@@ -1,7 +1,7 @@
 #include <cstring>
 
 #include "Color/ColorCycle.h"
-#include "Config/Persistent.h"
+#include "Config/PersistentConfig.h"
 #include "Config/Server.h"
 
 #define FASTLED_ALLOW_INTERRUPTS 0
@@ -42,7 +42,7 @@ const CRGB LED_TEMPERATURE = Tungsten100W;
 const uint8_t LED_BRIGHTNESS = 255;
 const float LED_GAMMA = 2.2;
 
-Config::Persistent config;
+Config::PersistentConfig config;
 Config::Server configServer(config);
 UPnP::EventServer *eventServer = NULL;
 Color::Gradient gradient;
@@ -269,7 +269,8 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 }
 
 void initializeSubscription() {
-	if (!config.active()) {
+	const Config::SonosConfig &sonosConfig = config.sonos();
+	if (!sonosConfig.active()) {
 		setReady(true);
 	} else if (eventServer) {
 		Sonos::Discover discover;
@@ -279,8 +280,8 @@ void initializeSubscription() {
 			Serial.println(addr);
 
 			Sonos::ZoneGroupTopology topo(addr);
-			bool discoverResult = topo.GetZoneGroupState_Decoded([](Sonos::ZoneInfo info) {
-				if (info.uuid == config.roomUUID()) {
+			bool discoverResult = topo.GetZoneGroupState_Decoded([&sonosConfig](Sonos::ZoneInfo info) {
+				if (info.uuid == sonosConfig.roomUUID()) {
 					subscribeToVolumeChange(info);
 				}
 			});

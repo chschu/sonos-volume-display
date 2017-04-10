@@ -8,14 +8,14 @@
 
 namespace Config {
 
-class Persistent;
+class PersistentConfig;
 
 class Server {
 public:
 	typedef std::function<void()> Callback;
 
-	Server(Persistent &config, IPAddress addr, uint16_t port = 80);
-	Server(Persistent &config, uint16_t port = 80);
+	Server(PersistentConfig &config, IPAddress addr, uint16_t port = 80);
+	Server(PersistentConfig &config, uint16_t port = 80);
 
 	void begin();
 	void handleClient();
@@ -35,7 +35,7 @@ public:
 	void onAfterConfigurationChange(Callback callback);
 
 private:
-	Persistent &_config;
+	PersistentConfig &_config;
 
 	ESP8266WebServer _server;
 
@@ -47,10 +47,10 @@ private:
 
 	void _handleGetApiDiscoverNetworks();
 	void _handleGetApiDiscoverRooms();
-	void _handleGetApiNetwork();
-	void _handlePostApiNetwork();
-	void _handleGetApiConfig();
-	void _handlePostApiConfig();
+	void _handleGetApiConfigNetwork();
+	void _handlePostApiConfigNetwork();
+	void _handleGetApiConfigSonos();
+	void _handlePostApiConfigSonos();
 };
 
 } /* namespace Config */
