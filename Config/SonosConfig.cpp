@@ -16,20 +16,20 @@ bool SonosConfig::setActive(bool active) {
 	return true;
 }
 
-const char *SonosConfig::roomUUID() const {
-	return _data.roomUUID;
+const char *SonosConfig::roomUuid() const {
+	return _data.roomUuid;
 }
 
-bool SonosConfig::setRoomUUID(const char *roomUUID) {
-	if (strlen(roomUUID) >= sizeof(_data.roomUUID)) {
+bool SonosConfig::setRoomUuid(const char *roomUuid) {
+	if (strlen(roomUuid) >= sizeof(_data.roomUuid)) {
 		return false;
 	}
-	strcpy(_data.roomUUID, roomUUID);
+	strcpy(_data.roomUuid, roomUuid);
 	return true;
 }
 
 bool SonosConfig::reset() {
-	return setActive(false) && setRoomUUID("");
+	return setActive(false) && setRoomUuid("");
 }
 
 } /* namespace Config */

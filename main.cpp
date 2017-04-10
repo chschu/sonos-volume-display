@@ -281,7 +281,7 @@ void initializeSubscription() {
 
 			Sonos::ZoneGroupTopology topo(addr);
 			bool discoverResult = topo.GetZoneGroupState_Decoded([&sonosConfig](Sonos::ZoneInfo info) {
-				if (info.uuid == sonosConfig.roomUUID()) {
+				if (info.uuid == sonosConfig.roomUuid()) {
 					subscribeToVolumeChange(info);
 				}
 			});

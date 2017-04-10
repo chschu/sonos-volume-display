@@ -7,7 +7,7 @@ class SonosConfig {
 public:
 	typedef struct Data {
 		bool active;
-		char roomUUID[32];
+		char roomUuid[32];
 	};
 
 	SonosConfig(Data &data);
@@ -15,8 +15,8 @@ public:
 	bool active() const;
 	bool setActive(bool active);
 
-	const char *roomUUID() const;
-	bool setRoomUUID(const char *roomUUID);
+	const char *roomUuid() const;
+	bool setRoomUuid(const char *roomUuid);
 
 	bool reset();
 

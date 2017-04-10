@@ -157,7 +157,7 @@ void Server::_handlePostApiConfigSonos() {
 	String roomUUID;
 
 	if (_handleArg(F("active"), sonosConfig, &SonosConfig::setActive)
-			&& _handleArg(F("room-uuid"), sonosConfig, &SonosConfig::setRoomUUID)) {
+			&& _handleArg(F("room-uuid"), sonosConfig, &SonosConfig::setRoomUuid)) {
 		if (_beforeSonosConfigChangeCallback) {
 			_beforeSonosConfigChangeCallback();
 		}
@@ -182,7 +182,7 @@ void Server::_sendResponseSonos(int code) {
 	JSON::Builder json;
 	json.beginObject();
 	json.attribute(F("active"), sonosConfig.active());
-	json.attribute(F("room-uuid"), sonosConfig.roomUUID());
+	json.attribute(F("room-uuid"), sonosConfig.roomUuid());
 	json.endObject();
 
 	_server.send(code, F("application/json; charset=utf-8"), json.toString());
