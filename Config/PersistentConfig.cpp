@@ -12,6 +12,10 @@ PersistentConfig::PersistentConfig(uint32_t magic) :
 		_magic(magic) {
 }
 
+NetworkConfig PersistentConfig::network() {
+	return NetworkConfig(_data.network);
+}
+
 SonosConfig PersistentConfig::sonos() {
 	return SonosConfig(_data.sonos);
 }
@@ -60,7 +64,7 @@ void PersistentConfig::save() {
 }
 
 bool PersistentConfig::reset() {
-	return sonos().reset();
+	return network().reset() && sonos().reset();
 }
 
 } /* namespace Config */

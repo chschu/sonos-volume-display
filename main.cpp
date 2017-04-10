@@ -1,9 +1,3 @@
-#include <cstring>
-
-#include "Color/ColorCycle.h"
-#include "Config/PersistentConfig.h"
-#include "Config/Server.h"
-
 #define FASTLED_ALLOW_INTERRUPTS 0
 #define FASTLED_ESP8266_RAW_PIN_ORDER
 
@@ -27,13 +21,21 @@
 #include <cmath>
 #include <cstdint>
 #include <cassert>
+#include <cstring>
 
+#include "Color/ColorCycle.h"
 #include "Color/Gradient.h"
 #include "Color/RGB.h"
+#include "Config/NetworkConfig.h"
+#include "Config/PersistentConfig.h"
+#include "Config/Server.h"
+#include "Config/SonosConfig.h"
 #include "Sonos/Discover.h"
 #include "Sonos/ZoneGroupTopology.h"
 #include "UPnP/EventServer.h"
 #include "XML/Utilities.h"
+
+const String HOSTNAME = String("svd-") + String(ESP.getChipId(), 16);
 
 const uint16_t LED_COUNT = 24;
 const uint8_t LED_PIN = D1;
@@ -268,6 +270,24 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	}
 }
 
+void connectWiFi() {
+	const Config::NetworkConfig &networkConfig = config.network();
+
+	WiFi.mode(WIFI_AP);
+	WiFi.softAP(HOSTNAME.c_str(), "q1w2e3r4");
+	WiFi.setAutoConnect(true);
+	WiFi.setAutoReconnect(true);
+
+	if (networkConfig.ssid() != "") {
+		WiFi.enableSTA(true);
+		WiFi.hostname(HOSTNAME);
+		WiFi.begin(networkConfig.ssid(), networkConfig.passphrase());
+	} else {
+		WiFi.enableSTA(false);
+		WiFi.begin();
+	}
+}
+
 void initializeSubscription() {
 	const Config::SonosConfig &sonosConfig = config.sonos();
 	if (!sonosConfig.active()) {
@@ -324,11 +344,11 @@ void setup() {
 
 	setReady(false);
 
-	WiFi.mode(WIFI_AP_STA);
-	WiFi.softAP((String("SVD-") + String(ESP.getChipId(), 16)).c_str(), "q1w2e3r4");
-	WiFi.setAutoConnect(true);
-	WiFi.setAutoReconnect(true);
-	WiFi.begin();
+	// load configuration from EEPROM
+	config.load();
+
+	// enable WiFi and start connecting
+	connectWiFi();
 
 	// prepare colors for gradient
 	Color::RGB red = { 255, 0, 0 };
@@ -353,11 +373,9 @@ void setup() {
 	FastLED.setTemperature(LED_TEMPERATURE);
 	FastLED.setBrightness(LED_BRIGHTNESS);
 
-	// load configuration from EEPROM
-	config.load();
-
 	// start web server for configuration
-	configServer.onBeforeNetworkChange(destroyEventServer);
+	configServer.onBeforeNetworkConfigChange(destroyEventServer);
+	configServer.onAfterNetworkConfigChange(connectWiFi);
 	configServer.onBeforeSonosConfigChange(destroySubscription);
 	configServer.onAfterSonosConfigChange(initializeSubscription);
 	configServer.begin();

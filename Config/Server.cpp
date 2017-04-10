@@ -1,16 +1,13 @@
 #include "Server.h"
 
 #include <ESP8266WiFi.h>
-#include <HardwareSerial.h>
 #include <include/wl_definitions.h>
-#include <stddef.h>
-#include <WString.h>
 
 #include "../JSON/Builder.h"
 #include "../Sonos/Discover.h"
 #include "../Sonos/ZoneGroupTopology.h"
-#include "PersistentConfig.h"
 #include "SonosConfig.h"
+#include "NetworkConfig.h"
 
 namespace Config {
 
@@ -40,8 +37,12 @@ void Server::stop() {
 	_server.stop();
 }
 
-void Server::onBeforeNetworkChange(Callback callback) {
-	_beforeNetworkChangeCallback = callback;
+void Server::onBeforeNetworkConfigChange(Callback callback) {
+	_beforeNetworkConfigChangeCallback = callback;
+}
+
+void Server::onAfterNetworkConfigChange(Callback callback) {
+	_afterNetworkConfigChangeCallback = callback;
 }
 
 void Server::onBeforeSonosConfigChange(Callback callback) {
@@ -103,45 +104,33 @@ void Server::_handleGetApiDiscoverRooms() {
 }
 
 void Server::_handleGetApiConfigNetwork() {
-	JSON::Builder json;
-	json.beginObject();
-	if (WiFi.isConnected()) {
-		json.attribute(F("connected"), true);
-		json.attribute(F("ssid"), WiFi.SSID());
-		json.attribute(F("bssid"), WiFi.BSSIDstr());
-		json.attribute(F("rssi"), WiFi.RSSI());
-	} else {
-		// funny case - where does the request come from?
-		json.attribute(F("connected"), false);
-	}
-	json.endObject();
-	_server.send(200, F("application/json; charset=utf-8"), json.toString());
+	_sendResponseNetwork(200);
 }
 
 void Server::_handlePostApiConfigNetwork() {
-	String ssid = _server.arg(F("ssid"));
-	String passphrase = _server.arg(F("passphrase"));
-	if (ssid.length()) {
-		JSON::Builder json;
-		json.value(F("OK"));
-		_server.send(201, F("application/json; charset=utf-8"), json.toString());
+	// copy config
+	PersistentConfig copy = _config;
 
-		if (_beforeNetworkChangeCallback) {
-			_beforeNetworkChangeCallback();
+	NetworkConfig networkConfig = copy.network();
+
+	if (_handleArg(F("ssid"), networkConfig, &NetworkConfig::setSsid)
+			&& _handleArg(F("passphrase"), networkConfig, &NetworkConfig::setPassphrase)) {
+
+		if (_beforeNetworkConfigChangeCallback) {
+			_beforeNetworkConfigChangeCallback();
 		}
 
-		// reconnect with new SSID and passphrase
-		Serial.println(F("WiFi disconnecting"));
-		WiFi.disconnect();
-		Serial.print(F("WiFi connecting with SSID "));
-		Serial.println(ssid);
-		WiFi.begin(ssid.c_str(), passphrase.length() ? passphrase.c_str() : NULL);
+		// copy modifications back and save
+		_config = copy;
+		_config.save();
 
-		if (_afterNetworkChangeCallback) {
-			_afterNetworkChangeCallback();
+		_sendResponseNetwork(200);
+
+		if (_afterNetworkConfigChangeCallback) {
+			_afterNetworkConfigChangeCallback();
 		}
 	} else {
-		_server.send(400, F("text/plain"), F("Missing Request Argument"));
+		_sendResponseNetwork(400);
 	}
 }
 
@@ -176,6 +165,29 @@ void Server::_handlePostApiConfigSonos() {
 	}
 }
 
+void Server::_sendResponseNetwork(int code) {
+	const NetworkConfig &networkConfig = _config.network();
+
+	JSON::Builder json;
+	json.beginObject();
+	json.attribute(F("ssid"), networkConfig.ssid());
+	json.attribute(F("passphrase"), F("********"));
+	json.attribute(F("status"));
+	json.beginObject();
+	json.attribute(F("connected"), WiFi.isConnected());
+	json.attribute(F("ssid"), WiFi.SSID());
+	json.attribute(F("passphrase"), F("********"));
+	json.attribute(F("hostname"), WiFi.hostname());
+	json.attribute(F("local-ip"), WiFi.localIP().toString());
+	json.attribute(F("gateway-ip"), WiFi.gatewayIP().toString());
+	json.attribute(F("dns-ip"), WiFi.dnsIP().toString());
+	json.attribute(F("bssid"), WiFi.BSSIDstr());
+	json.attribute(F("rssi"), WiFi.RSSI());
+	json.endObject();
+	json.endObject();
+
+	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+}
 void Server::_sendResponseSonos(int code) {
 	const SonosConfig &sonosConfig = _config.sonos();
 

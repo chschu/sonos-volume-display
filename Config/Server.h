@@ -5,6 +5,9 @@
 #include <IPAddress.h>
 #include <cstdint>
 #include <functional>
+#include <WString.h>
+
+#include "PersistentConfig.h"
 
 namespace Config {
 
@@ -21,12 +24,9 @@ public:
 	void handleClient();
 	void stop();
 
-	// set the callback for cleanup before disconnecting from the current WiFi network
-	void onBeforeNetworkChange(Callback callback);
-
-	// set the callback for cleanup before disconnecting from the current WiFi network
-	// the WiFi connection is probably not yet established when the callback is invoked
-	void onAfterNetworkChange(Callback callback);
+	// set Network configuration change callbacks
+	void onBeforeNetworkConfigChange(Callback callback);
+	void onAfterNetworkConfigChange(Callback callback);
 
 	// set Sonos Configuration change callbacks
 	void onBeforeSonosConfigChange(Callback callback);
@@ -37,8 +37,8 @@ private:
 
 	ESP8266WebServer _server;
 
-	Callback _beforeNetworkChangeCallback;
-	Callback _afterNetworkChangeCallback;
+	Callback _beforeNetworkConfigChangeCallback;
+	Callback _afterNetworkConfigChangeCallback;
 
 	Callback _beforeSonosConfigChangeCallback;
 	Callback _afterSonosConfigChangeCallback;
@@ -50,6 +50,7 @@ private:
 	void _handleGetApiConfigSonos();
 	void _handlePostApiConfigSonos();
 
+	void _sendResponseNetwork(int code);
 	void _sendResponseSonos(int code);
 
 	// extract the request argument, call a specialization of _convert(), and pass the result to the setter
