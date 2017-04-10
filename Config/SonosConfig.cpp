@@ -11,10 +11,8 @@ bool SonosConfig::active() const {
 	return _data.active;
 }
 
-bool SonosConfig::setActive(bool active, bool dryRun) {
-	if (!dryRun) {
-		_data.active = active;
-	}
+bool SonosConfig::setActive(bool active) {
+	_data.active = active;
 	return true;
 }
 
@@ -22,13 +20,11 @@ const char *SonosConfig::roomUUID() const {
 	return _data.roomUUID;
 }
 
-bool SonosConfig::setRoomUUID(const char *roomUUID, bool dryRun) {
+bool SonosConfig::setRoomUUID(const char *roomUUID) {
 	if (strlen(roomUUID) >= sizeof(_data.roomUUID)) {
 		return false;
 	}
-	if (!dryRun) {
-		strcpy(_data.roomUUID, roomUUID);
-	}
+	strcpy(_data.roomUUID, roomUUID);
 	return true;
 }
 

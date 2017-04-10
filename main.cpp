@@ -358,8 +358,8 @@ void setup() {
 
 	// start web server for configuration
 	configServer.onBeforeNetworkChange(destroyEventServer);
-	configServer.onBeforeConfigurationChange(destroySubscription);
-	configServer.onAfterConfigurationChange(initializeSubscription);
+	configServer.onBeforeSonosConfigChange(destroySubscription);
+	configServer.onAfterSonosConfigChange(initializeSubscription);
 	configServer.begin();
 }
 

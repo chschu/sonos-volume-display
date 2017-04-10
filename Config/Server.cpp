@@ -10,6 +10,7 @@
 #include "../Sonos/Discover.h"
 #include "../Sonos/ZoneGroupTopology.h"
 #include "PersistentConfig.h"
+#include "SonosConfig.h"
 
 namespace Config {
 
@@ -43,12 +44,12 @@ void Server::onBeforeNetworkChange(Callback callback) {
 	_beforeNetworkChangeCallback = callback;
 }
 
-void Server::onBeforeConfigurationChange(Callback callback) {
-	_beforeConfigurationChangeCallback = callback;
+void Server::onBeforeSonosConfigChange(Callback callback) {
+	_beforeSonosConfigChangeCallback = callback;
 }
 
-void Server::onAfterConfigurationChange(Callback callback) {
-	_afterConfigurationChangeCallback = callback;
+void Server::onAfterSonosConfigChange(Callback callback) {
+	_afterSonosConfigChangeCallback = callback;
 }
 
 void Server::_handleGetApiDiscoverNetworks() {
@@ -145,65 +146,76 @@ void Server::_handlePostApiConfigNetwork() {
 }
 
 void Server::_handleGetApiConfigSonos() {
-	SonosConfig sonosConfig = _config.sonos();
-
-	JSON::Builder json;
-	json.beginObject();
-	json.attribute(F("active"), sonosConfig.active() ? F("true") : F("false"));
-	json.attribute(F("room-uuid"), sonosConfig.roomUUID());
-	json.endObject();
-	_server.send(200, F("application/json; charset=utf-8"), json.toString());
+	_sendResponseSonos(200);
 }
 
 void Server::_handlePostApiConfigSonos() {
-	SonosConfig sonosConfig = _config.sonos();
+	PersistentConfig copy = _config;
+	SonosConfig sonosConfig = copy.sonos();
 
 	bool active;
 	String roomUUID;
 
-	if (_server.hasArg(F("active"))) {
-		String activeString = _server.arg(F("active"));
-		if (activeString == "false") {
-			active = false;
-		} else if (activeString == "true") {
-			active = true;
-		} else {
-			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
-			return;
+	if (_handleArg(F("active"), sonosConfig, &SonosConfig::setActive)
+			&& _handleArg(F("room-uuid"), sonosConfig, &SonosConfig::setRoomUUID)) {
+		if (_beforeSonosConfigChangeCallback) {
+			_beforeSonosConfigChangeCallback();
 		}
-		if (!sonosConfig.setActive(active, true)) {
-			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
-			return;
-		}
-	} else {
-		active = sonosConfig.active();
-	}
 
-	if (_server.hasArg(F("room-uuid"))) {
-		roomUUID = _server.arg(F("room-uuid"));
-		if (!sonosConfig.setRoomUUID(roomUUID.c_str(), true)) {
-			_server.send(400, F("text/plain"), F("Invalid Request Argument"));
-			return;
+		// copy modifications back and save
+		_config = copy;
+		_config.save();
+
+		_sendResponseSonos(200);
+
+		if (_afterSonosConfigChangeCallback) {
+			_afterSonosConfigChangeCallback();
 		}
 	} else {
-		roomUUID = sonosConfig.roomUUID();
+		_sendResponseSonos(400);
 	}
+}
+
+void Server::_sendResponseSonos(int code) {
+	const SonosConfig &sonosConfig = _config.sonos();
 
 	JSON::Builder json;
-	json.value(F("OK"));
-	_server.send(201, F("application/json; charset=utf-8"), json.toString());
+	json.beginObject();
+	json.attribute(F("active"), sonosConfig.active());
+	json.attribute(F("room-uuid"), sonosConfig.roomUUID());
+	json.endObject();
 
-	if (_beforeConfigurationChangeCallback) {
-		_beforeConfigurationChangeCallback();
+	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+}
+
+template<typename C, typename T>
+bool Server::_handleArg(const String &name, C &config, bool (C::*setter)(T)) {
+	if (!_server.hasArg(name)) {
+		return true;
 	}
+	String valueString = _server.arg(name);
+	T value;
+	return _convert(valueString, &value) && (config.*setter)(value);
+}
 
-	sonosConfig.setActive(active);
-	sonosConfig.setRoomUUID(roomUUID.c_str());
-	_config.save();
-
-	if (_afterConfigurationChangeCallback) {
-		_afterConfigurationChangeCallback();
+template<>
+bool Server::_convert(const String &input, bool *output) {
+	String lower = input;
+	lower.toLowerCase();
+	if (lower == "true" || lower == "yes" || lower == "t" || lower == "y" || lower == "1") {
+		*output = true;
+	} else if (lower == "false" || lower == "no" || lower == "f" || lower == "n" || lower == "0") {
+		*output = false;
+	} else {
+		return false;
 	}
+	return true;
+}
+
+template<>
+bool Server::_convert(const String &input, const char **output) {
+	*output = input.c_str();
+	return true;
 }
 
 } /* namespace Config */

@@ -13,10 +13,10 @@ public:
 	SonosConfig(Data &data);
 
 	bool active() const;
-	bool setActive(bool active, bool dryRun = false);
+	bool setActive(bool active);
 
 	const char *roomUUID() const;
-	bool setRoomUUID(const char *roomUUID, bool dryRun = false);
+	bool setRoomUUID(const char *roomUUID);
 
 	bool reset();
 

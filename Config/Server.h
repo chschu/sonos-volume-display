@@ -28,11 +28,9 @@ public:
 	// the WiFi connection is probably not yet established when the callback is invoked
 	void onAfterNetworkChange(Callback callback);
 
-	// set the callback for cleanup before a configuration change
-	void onBeforeConfigurationChange(Callback callback);
-
-	// set the callback for initialization after a configuration change
-	void onAfterConfigurationChange(Callback callback);
+	// set Sonos Configuration change callbacks
+	void onBeforeSonosConfigChange(Callback callback);
+	void onAfterSonosConfigChange(Callback callback);
 
 private:
 	PersistentConfig &_config;
@@ -42,8 +40,8 @@ private:
 	Callback _beforeNetworkChangeCallback;
 	Callback _afterNetworkChangeCallback;
 
-	Callback _beforeConfigurationChangeCallback;
-	Callback _afterConfigurationChangeCallback;
+	Callback _beforeSonosConfigChangeCallback;
+	Callback _afterSonosConfigChangeCallback;
 
 	void _handleGetApiDiscoverNetworks();
 	void _handleGetApiDiscoverRooms();
@@ -51,6 +49,16 @@ private:
 	void _handlePostApiConfigNetwork();
 	void _handleGetApiConfigSonos();
 	void _handlePostApiConfigSonos();
+
+	void _sendResponseSonos(int code);
+
+	// extract the request argument, call a specialization of _convert(), and pass the result to the setter
+	template<typename C, typename T>
+	bool _handleArg(const String &name, C &config, bool (C::*setter)(T));
+
+	// converter template, used by _handleArg()
+	template<typename T>
+	bool _convert(const String &input, T *output);
 };
 
 } /* namespace Config */
