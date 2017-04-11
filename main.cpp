@@ -62,15 +62,22 @@ const Color::RGB MUTE_COLOR = { 0, 0, 63 };
 const uint16_t COLOR_CYCLE_LENGTH = 57;
 const Color::ColorCycle COLOR_CYCLE(COLOR_CYCLE_LENGTH, 0, COLOR_CYCLE_LENGTH / 3, 2 * COLOR_CYCLE_LENGTH / 3);
 
+// top-level states
 typedef enum {
-	DS_COLOR_CYCLE, DS_HIDE, DS_SHOW_TEMPORARY, DS_SHOW_PERMANENT
+	DS_INACTIVE, DS_ACTIVE,
 } DisplayState;
 
-DisplayState displayState = DS_COLOR_CYCLE;
+// sub-states for DS_ACTIVE
+typedef enum {
+	DASS_HIDING, DASS_SHOWING_VOLUME, DASS_SHOWING_MUTE,
+} DisplayActiveSubState;
+
+DisplayState displayState = DS_INACTIVE;
+DisplayActiveSubState displayActiveSubState;
 
 Ticker displayUpdateTicker;
 
-unsigned long lastUpdate = 0;
+unsigned long lastStateChangeMillis = 0;
 
 typedef struct VolumeState {
 	int8_t master, lf, rf, mute;
@@ -171,8 +178,8 @@ void renderingControlEventCallback(String SID, Stream &stream) {
 		// show if all attributes are valid
 		if (current.complete()) {
 			Serial.printf("master=%u, lf=%u, rf=%u, mute=%u\r\n", current.master, current.lf, current.rf, current.mute);
-			displayState = current.mute ? DS_SHOW_PERMANENT : DS_SHOW_TEMPORARY;
-			lastUpdate = millis();
+			displayActiveSubState = current.mute ? DASS_SHOWING_MUTE : DASS_SHOWING_VOLUME;
+			lastStateChangeMillis = millis();
 		}
 	}
 }
@@ -194,7 +201,9 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	if (result) {
 		Serial.print(F("Subscribed with new SID "));
 		Serial.println(newSID);
-		displayState = DS_HIDE;
+		displayState = DS_ACTIVE;
+		displayActiveSubState = DASS_HIDING;
+		lastStateChangeMillis = millis();
 	} else {
 		Serial.println(F("Subscription failed"));
 	}
@@ -219,7 +228,7 @@ void connectWiFi() {
 }
 
 void initializeSubscription() {
-	displayState = DS_COLOR_CYCLE;
+	lastStateChangeMillis = millis();
 
 	const Config::SonosConfig &sonosConfig = config.sonos();
 	if (sonosConfig.active() && eventServer) {
@@ -240,7 +249,8 @@ void initializeSubscription() {
 }
 
 void destroySubscription() {
-	displayState = DS_COLOR_CYCLE;
+	displayState = DS_INACTIVE;
+	lastStateChangeMillis = millis();
 
 	if (eventServer) {
 		eventServer->unsubscribeAll();
@@ -258,7 +268,8 @@ void initializeEventServer() {
 }
 
 void destroyEventServer() {
-	displayState = DS_COLOR_CYCLE;
+	displayState = DS_INACTIVE;
+	lastStateChangeMillis = millis();
 
 	if (eventServer) {
 		Serial.println("destroying EventServer on WiFi disconnect");
@@ -270,19 +281,24 @@ void destroyEventServer() {
 
 void updateDisplay() {
 	static int16_t colorCycleOffset = -1;
-	static uint16_t ledOffset;
+	static int16_t colorCycleLedOffset = -1;
+	static int16_t updateCycleLedOffset = -1;
 
-	if (displayState == DS_SHOW_TEMPORARY && millis() - lastUpdate > 2000) {
-		displayState = DS_HIDE;
+	if (displayState == DS_ACTIVE && displayActiveSubState == DASS_SHOWING_VOLUME
+			&& millis() - lastStateChangeMillis > 2000) {
+		displayActiveSubState = DASS_HIDING;
+		lastStateChangeMillis = millis();
 	}
 
-	if (displayState == DS_COLOR_CYCLE) {
-		if (colorCycleOffset < 0) {
+	if (displayState != DS_INACTIVE) {
+		colorCycleLedOffset = -1;
+	}
+
+	if (displayState == DS_INACTIVE) {
+		if (colorCycleLedOffset < 0) {
 			// initialize color cycle
-			for (int i = 0; i < LED_COUNT; i++) {
-				leds[i] = CRGB::Black;
-			}
-			ledOffset = 0;
+			FastLED.clear();
+			colorCycleLedOffset = 0;
 			colorCycleOffset = 0;
 		}
 
@@ -291,49 +307,51 @@ void updateDisplay() {
 			leds[i] = leds[i].fadeToBlackBy(20);
 		}
 		Color::RGB color = COLOR_CYCLE.get(colorCycleOffset);
-		leds[ledOffset] = applyGamma_video(CRGB(color.red, color.green, color.blue), LED_GAMMA);
+		leds[colorCycleLedOffset] = applyGamma_video(CRGB(color.red, color.green, color.blue), LED_GAMMA);
 
 		// update offsets
-		if (++ledOffset == LED_COUNT) {
-			ledOffset = 0;
+		if (++colorCycleLedOffset == LED_COUNT) {
+			colorCycleLedOffset = 0;
 		}
 		if (++colorCycleOffset == COLOR_CYCLE_LENGTH) {
 			colorCycleOffset = 0;
 		}
-	} else if (displayState == DS_HIDE) {
-		colorCycleOffset = -1;
-		FastLED.clear();
-	} else if (displayState == DS_SHOW_TEMPORARY || displayState == DS_SHOW_PERMANENT) {
-		colorCycleOffset = -1;
+	} else if (displayState == DS_ACTIVE) {
+		if (displayActiveSubState == DASS_SHOWING_VOLUME || displayActiveSubState == DASS_SHOWING_MUTE) {
+			FastLED.clear();
 
-		FastLED.clear();
+			float leftLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(current.master * current.lf / 10000.0);
+			uint16_t leftLedInt = floor(leftLed);
+			float leftLedFrac = leftLed - leftLedInt;
+			for (uint16_t i = 0; i < leftLedInt; i++) {
+				Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(i);
+				CRGB temp(color.red, color.green, color.blue);
+				leds[i] = applyGamma_video(temp, LED_GAMMA);
+			}
+			if (leftLedInt < LED_COUNT / 2) {
+				Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(leftLedInt);
+				CRGB temp(leftLedFrac * color.red, leftLedFrac * color.green, leftLedFrac * color.blue);
+				leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
+			}
 
-		float leftLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(current.master * current.lf / 10000.0);
-		uint16_t leftLedInt = floor(leftLed);
-		float leftLedFrac = leftLed - leftLedInt;
-		for (uint16_t i = 0; i < leftLedInt; i++) {
-			Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(i);
-			CRGB temp(color.red, color.green, color.blue);
-			leds[i] = applyGamma_video(temp, LED_GAMMA);
-		}
-		if (leftLedInt < LED_COUNT / 2) {
-			Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(leftLedInt);
-			CRGB temp(leftLedFrac * color.red, leftLedFrac * color.green, leftLedFrac * color.blue);
-			leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
-		}
-
-		float rightLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(current.master * current.rf / 10000.0);
-		uint16_t rightLedInt = floor(rightLed);
-		float rightLedFrac = rightLed - rightLedInt;
-		for (uint16_t i = 0; i < rightLedInt; i++) {
-			Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - i);
-			CRGB temp(color.red, color.green, color.blue);
-			leds[LED_COUNT - 1 - i] = applyGamma_video(temp, LED_GAMMA);
-		}
-		if (rightLedInt < LED_COUNT / 2) {
-			Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - rightLedInt);
-			CRGB temp(rightLedFrac * color.red, rightLedFrac * color.green, rightLedFrac * color.blue);
-			leds[LED_COUNT - 1 - rightLedInt] = applyGamma_video(temp, LED_GAMMA);
+			float rightLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(current.master * current.rf / 10000.0);
+			uint16_t rightLedInt = floor(rightLed);
+			float rightLedFrac = rightLed - rightLedInt;
+			for (uint16_t i = 0; i < rightLedInt; i++) {
+				Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - i);
+				CRGB temp(color.red, color.green, color.blue);
+				leds[LED_COUNT - 1 - i] = applyGamma_video(temp, LED_GAMMA);
+			}
+			if (rightLedInt < LED_COUNT / 2) {
+				Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - rightLedInt);
+				CRGB temp(rightLedFrac * color.red, rightLedFrac * color.green, rightLedFrac * color.blue);
+				leds[LED_COUNT - 1 - rightLedInt] = applyGamma_video(temp, LED_GAMMA);
+			}
+		} else if (displayActiveSubState == DASS_HIDING) {
+			FastLED.clear();
+		} else {
+			Serial.print(F("unknown display active sub-state: "));
+			Serial.println(displayActiveSubState);
 		}
 	} else {
 		Serial.print(F("unknown display state: "));
@@ -378,7 +396,6 @@ void setup() {
 	// enable WiFi and start connecting
 	connectWiFi();
 
-	// start web server for configuration
 	configServer.onBeforeNetworkConfigChange(destroyEventServer);
 	configServer.onAfterNetworkConfigChange(connectWiFi);
 	configServer.onBeforeSonosConfigChange(destroySubscription);
