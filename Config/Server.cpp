@@ -1,13 +1,16 @@
 #include "Server.h"
 
+#include <Arduino.h>
+#include <Esp.h>
 #include <ESP8266WiFi.h>
-#include <include/wl_definitions.h>
+#include <HardwareSerial.h>
+#include <Updater.h>
 
 #include "../JSON/Builder.h"
 #include "../Sonos/Discover.h"
 #include "../Sonos/ZoneGroupTopology.h"
-#include "SonosConfig.h"
 #include "NetworkConfig.h"
+#include "SonosConfig.h"
 
 namespace Config {
 
@@ -26,6 +29,8 @@ void Server::begin() {
 	_server.on("/api/config/network", HTTP_POST, std::bind(&Server::_handlePostApiConfigNetwork, this));
 	_server.on("/api/config/sonos", HTTP_GET, std::bind(&Server::_handleGetApiConfigSonos, this));
 	_server.on("/api/config/sonos", HTTP_POST, std::bind(&Server::_handlePostApiConfigSonos, this));
+	_server.on("/api/update", HTTP_POST, std::bind(&Server::_handlePostApiUpdate, this),
+			std::bind(&Server::_handlePostApiUpdateUpload, this));
 	_server.begin();
 }
 
@@ -35,6 +40,18 @@ void Server::handleClient() {
 
 void Server::stop() {
 	_server.stop();
+}
+
+void Server::onBeforeUpdate(Callback callback) {
+	_beforeUpdateCallback = callback;
+}
+
+void Server::onAfterSuccessfulUpdate(Callback callback) {
+	_afterSuccessfulUpdateCallback = callback;
+}
+
+void Server::onAfterFailedUpdate(Callback callback) {
+	_afterFailedUpdateCallback = callback;
 }
 
 void Server::onBeforeNetworkConfigChange(Callback callback) {
@@ -193,6 +210,63 @@ void Server::_sendResponseSonos(int code) {
 	json.endObject();
 
 	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+}
+
+void Server::_handlePostApiUpdate() {
+	bool success = !Update.hasError();
+
+	JSON::Builder json;
+	json.beginObject();
+	json.attribute(F("success"), success);
+	json.attribute(F("md5"), Update.md5String());
+	json.endObject();
+
+	if (success) {
+		_server.send(200, F("application/json; charset=utf-8"), json.toString());
+		Serial.println("Rebooting...");
+		ESP.restart();
+	} else {
+		_server.send(500, F("application/json; charset=utf-8"), json.toString());
+	}
+}
+
+void Server::_handlePostApiUpdateUpload() {
+	// handler for the file upload, get's the sketch bytes, and writes
+	// them through the Update object
+	HTTPUpload &upload = _server.upload();
+	if (upload.status == UPLOAD_FILE_START) {
+		Serial.printf("Update Start: %s\r\n", upload.filename.c_str());
+		uint32_t maxSketchSize = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+		if (Update.begin(maxSketchSize)) {
+			if (_beforeUpdateCallback) {
+				_beforeUpdateCallback();
+			}
+		}
+	} else if (upload.status == UPLOAD_FILE_WRITE) {
+		if (Update.write(upload.buf, upload.currentSize) == upload.currentSize) {
+			Serial.printf("Update Progress: %u\r\n", upload.totalSize);
+		}
+		Serial.printf("Update Progress: %u\r\n", upload.totalSize);
+	} else if (upload.status == UPLOAD_FILE_END) {
+		if (Update.end(true)) {
+			Serial.printf("Update Success: %u\r\n", upload.totalSize);
+			if (_afterSuccessfulUpdateCallback) {
+				_afterSuccessfulUpdateCallback();
+			}
+		} else {
+			Serial.print("Update Failed: ");
+			Update.printError(Serial);
+			if (_afterFailedUpdateCallback) {
+				_afterFailedUpdateCallback();
+			}
+		}
+	} else if (upload.status == UPLOAD_FILE_ABORTED) {
+		Update.end();
+		Serial.println("Update Aborted");
+		if (_afterFailedUpdateCallback) {
+			_afterFailedUpdateCallback();
+		}
+	}
 }
 
 template<typename C, typename T>

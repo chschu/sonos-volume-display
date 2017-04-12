@@ -64,7 +64,7 @@ const Color::ColorCycle COLOR_CYCLE(COLOR_CYCLE_LENGTH, 0, COLOR_CYCLE_LENGTH / 
 
 // top-level states
 typedef enum {
-	DS_INACTIVE, DS_ACTIVE,
+	DS_INACTIVE, DS_ACTIVE, DS_UPDATING,
 } DisplayState;
 
 // sub-states for DS_ACTIVE
@@ -72,8 +72,14 @@ typedef enum {
 	DASS_HIDING, DASS_SHOWING_VOLUME, DASS_SHOWING_MUTE,
 } DisplayActiveSubState;
 
+// sub-states for DS_UPDATING
+typedef enum {
+	DUSS_UPDATE_IN_PROGRESS, DUSS_UPDATE_SUCCESSFUL, DUSS_UPDATE_FAILED,
+} DisplayUpdatingSubState;
+
 DisplayState displayState = DS_INACTIVE;
 DisplayActiveSubState displayActiveSubState;
+DisplayUpdatingSubState displayUpdatingSubState;
 
 Ticker displayUpdateTicker;
 
@@ -290,8 +296,19 @@ void updateDisplay() {
 		lastStateChangeMillis = millis();
 	}
 
+	if (displayState == DS_UPDATING && displayUpdatingSubState == DUSS_UPDATE_FAILED
+			&& millis() - lastStateChangeMillis > 2000) {
+		displayState = DS_ACTIVE;
+		displayActiveSubState = DASS_HIDING;
+		lastStateChangeMillis = millis();
+	}
+
 	if (displayState != DS_INACTIVE) {
 		colorCycleLedOffset = -1;
+	}
+
+	if (displayState != DS_UPDATING) {
+		updateCycleLedOffset = -1;
 	}
 
 	if (displayState == DS_INACTIVE) {
@@ -353,6 +370,41 @@ void updateDisplay() {
 			Serial.print(F("unknown display active sub-state: "));
 			Serial.println(displayActiveSubState);
 		}
+	} else if (displayState == DS_UPDATING) {
+		if (displayUpdatingSubState == DUSS_UPDATE_IN_PROGRESS) {
+			if (updateCycleLedOffset < 0) {
+				// initialize update cycle
+				FastLED.clear();
+				updateCycleLedOffset = 0;
+			}
+
+			// update LEDs
+			for (int i = 0; i < LED_COUNT; i++) {
+				leds[i] = leds[i].fadeToBlackBy(40);
+			}
+			leds[updateCycleLedOffset] = applyGamma_video(CRGB(255, 255, 0), LED_GAMMA);
+			leds[(updateCycleLedOffset + LED_COUNT / 2) % LED_COUNT] = applyGamma_video(CRGB(255, 0, 255), LED_GAMMA);
+
+			/* update offsets */
+			if (++updateCycleLedOffset == LED_COUNT) {
+				updateCycleLedOffset = 0;
+			}
+		} else if (displayUpdatingSubState == DUSS_UPDATE_SUCCESSFUL) {
+			for (uint16_t i = 0; i < LED_COUNT; i++) {
+				Color::RGB color = { 0, 255, 0 };
+				CRGB temp(color.red, color.green, color.blue);
+				leds[i] = applyGamma_video(temp, LED_GAMMA);
+			}
+		} else if (displayUpdatingSubState == DUSS_UPDATE_FAILED) {
+			for (uint16_t i = 0; i < LED_COUNT; i++) {
+				Color::RGB color = { 255, 0, 0 };
+				CRGB temp(color.red, color.green, color.blue);
+				leds[i] = applyGamma_video(temp, LED_GAMMA);
+			}
+		} else {
+			Serial.print(F("unknown display updating sub-state: "));
+			Serial.println(displayUpdatingSubState);
+		}
 	} else {
 		Serial.print(F("unknown display state: "));
 		Serial.println(displayState);
@@ -396,6 +448,27 @@ void setup() {
 	// enable WiFi and start connecting
 	connectWiFi();
 
+	// start web server for configuration
+	configServer.onBeforeUpdate([]() {
+		displayState = DS_UPDATING;
+		displayUpdatingSubState = DUSS_UPDATE_IN_PROGRESS;
+		lastStateChangeMillis = millis();
+	});
+	static unsigned int prevBlock = 0;
+	configServer.onBeforeUpdate([]() {
+		prevBlock = 0;
+		displayState = DS_UPDATING;
+		displayUpdatingSubState = DUSS_UPDATE_IN_PROGRESS;
+		lastStateChangeMillis = millis();
+	});
+	configServer.onAfterSuccessfulUpdate([]() {
+		displayUpdatingSubState = DUSS_UPDATE_SUCCESSFUL;
+		lastStateChangeMillis = millis();
+	});
+	configServer.onAfterFailedUpdate([]() {
+		displayUpdatingSubState = DUSS_UPDATE_FAILED;
+		lastStateChangeMillis = millis();
+	});
 	configServer.onBeforeNetworkConfigChange(destroyEventServer);
 	configServer.onAfterNetworkConfigChange(connectWiFi);
 	configServer.onBeforeSonosConfigChange(destroySubscription);
