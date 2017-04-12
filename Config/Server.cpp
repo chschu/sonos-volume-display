@@ -108,9 +108,7 @@ void Server::_handleGetApiConfigNetwork() {
 }
 
 void Server::_handlePostApiConfigNetwork() {
-	// copy config
 	PersistentConfig copy = _config;
-
 	NetworkConfig networkConfig = copy.network();
 
 	if (_handleArg(F("ssid"), networkConfig, &NetworkConfig::setSsid)
@@ -141,9 +139,6 @@ void Server::_handleGetApiConfigSonos() {
 void Server::_handlePostApiConfigSonos() {
 	PersistentConfig copy = _config;
 	SonosConfig sonosConfig = copy.sonos();
-
-	bool active;
-	String roomUUID;
 
 	if (_handleArg(F("active"), sonosConfig, &SonosConfig::setActive)
 			&& _handleArg(F("room-uuid"), sonosConfig, &SonosConfig::setRoomUuid)) {
