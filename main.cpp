@@ -170,6 +170,11 @@ bool renderingControlEventXmlTagCallback(String tag, VolumeState &volumeState) {
 }
 
 void renderingControlEventCallback(String SID, Stream &stream) {
+	// ignore events if not active
+	if (displayState != DS_ACTIVE) {
+		return;
+	}
+
 	// copy current state
 	VolumeState next = current;
 
