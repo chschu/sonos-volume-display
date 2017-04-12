@@ -18,7 +18,6 @@ class EventServer: public WiFiServer {
 public:
 	EventServer(IPAddress addr, uint16_t callbackPort = 1400);
 	EventServer(uint16_t callbackPort = 1400);
-	~EventServer();
 
 	// subscribe to an event at the endpoint defined via subscriptionURL
 	// should be called after begin() to avoid missing the initial event

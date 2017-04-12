@@ -12,7 +12,6 @@ public:
 	typedef std::function<void(uint16_t volume)> GetVolumeCallback;
 
 	RenderingControl(IPAddress deviceIP);
-	~RenderingControl();
 
 	bool GetVolume(GetVolumeCallback callback, uint32_t instanceID = 0, const char *channel = "Master");
 

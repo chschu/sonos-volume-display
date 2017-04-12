@@ -5,12 +5,6 @@
 
 namespace JSON {
 
-Builder::Builder() {
-}
-
-Builder::~Builder() {
-}
-
 void Builder::beginArray() {
 	_separator();
 	_json += '[';

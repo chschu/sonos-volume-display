@@ -13,9 +13,6 @@ public:
 	// discovery callback type
 	typedef std::function<bool(IPAddress remoteIP, Stream &stream)> Callback;
 
-	Discover();
-	~Discover();
-
 	// perform SSDP discovery using the given ST and MX values
 	// for every response received within the timeout, the callback is invoked
 	// if the callback returns false, discovery is terminated

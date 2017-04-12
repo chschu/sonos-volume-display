@@ -19,9 +19,6 @@ EventServer::EventServer(uint16_t callbackPort) :
 		WiFiServer(callbackPort), _callbackPort(callbackPort) {
 }
 
-EventServer::~EventServer() {
-}
-
 static unsigned int extractTimeoutSeconds(String timeoutResponseHeaderValue, unsigned int defaultValue) {
 	if (timeoutResponseHeaderValue.startsWith("Second-")) {
 		return atoi(timeoutResponseHeaderValue.c_str() + 7);

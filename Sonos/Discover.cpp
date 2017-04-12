@@ -6,12 +6,6 @@
 
 namespace Sonos {
 
-Discover::Discover() {
-}
-
-Discover::~Discover() {
-}
-
 bool Discover::discoverAny(IPAddress *deviceIP, unsigned long timeoutMillis) {
 	bool deviceFound = false;
 	return UPnP::Discover().discover([&deviceFound, deviceIP](IPAddress remoteIP, Stream &stream) -> bool {

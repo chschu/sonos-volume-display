@@ -20,7 +20,6 @@ public:
 	typedef std::function<void(ZoneInfo info)> ZoneInfoCallback;
 
 	ZoneGroupTopology(IPAddress deviceIP);
-	~ZoneGroupTopology();
 
 	bool GetZoneGroupState_Decoded(ZoneInfoCallback callback, bool visibleOnly = true);
 

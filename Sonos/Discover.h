@@ -7,9 +7,6 @@ namespace Sonos {
 
 class Discover {
 public:
-	Discover();
-	~Discover();
-
 	// discover any Sonos device on the network via UPnP/SSDP
 	// returns true if a device responds within the timeout, false otherwise
 	// if addr is not NULL, the device's IP address is stored in *addr

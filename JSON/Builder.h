@@ -7,9 +7,6 @@ namespace JSON {
 
 class Builder {
 public:
-	Builder();
-	~Builder();
-
 	// append a separator (',') if required, and start a JSON array ('[')
 	void beginArray();
 	// end a JSON array (']')

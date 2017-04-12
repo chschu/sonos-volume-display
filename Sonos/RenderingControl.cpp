@@ -26,9 +26,6 @@ RenderingControl::RenderingControl(IPAddress deviceIP) :
 		_deviceIP(deviceIP) {
 }
 
-RenderingControl::~RenderingControl() {
-}
-
 bool RenderingControl::GetVolume(GetVolumeCallback callback, uint32_t instanceID, const char *channel) {
 	size_t size = sizeof(GET_VOLUME) + (3 * sizeof(instanceID) - 2) + (strlen(channel) - 2);
 	char *buf = (char *) malloc(size);

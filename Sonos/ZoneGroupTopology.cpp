@@ -22,9 +22,6 @@ ZoneGroupTopology::ZoneGroupTopology(IPAddress deviceIP) :
 		_deviceIP(deviceIP) {
 }
 
-ZoneGroupTopology::~ZoneGroupTopology() {
-}
-
 bool ZoneGroupTopology::GetZoneGroupState_Decoded(ZoneInfoCallback callback, bool visibleOnly) {
 	bool result = false;
 
