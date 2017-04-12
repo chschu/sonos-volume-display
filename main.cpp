@@ -103,6 +103,23 @@ typedef struct VolumeState {
 
 VolumeState current;
 
+void setDisplayInactive() {
+	displayState = DS_INACTIVE;
+	lastStateChangeMillis = millis();
+}
+
+void setDisplayActive(DisplayActiveSubState subState) {
+	displayState = DS_ACTIVE;
+	displayActiveSubState = subState;
+	lastStateChangeMillis = millis();
+}
+
+void setDisplayUpdating(DisplayUpdatingSubState subState) {
+	displayState = DS_UPDATING;
+	displayUpdatingSubState = subState;
+	lastStateChangeMillis = millis();
+}
+
 bool renderingControlEventXmlTagCallback(String tag, VolumeState &volumeState) {
 	if (tag.startsWith("<Volume ")) {
 		String channel;
@@ -189,8 +206,7 @@ void renderingControlEventCallback(String SID, Stream &stream) {
 		// show if all attributes are valid
 		if (current.complete()) {
 			Serial.printf("master=%u, lf=%u, rf=%u, mute=%u\r\n", current.master, current.lf, current.rf, current.mute);
-			displayActiveSubState = current.mute ? DASS_SHOWING_MUTE : DASS_SHOWING_VOLUME;
-			lastStateChangeMillis = millis();
+			setDisplayActive(current.mute ? DASS_SHOWING_MUTE : DASS_SHOWING_VOLUME);
 		}
 	}
 }
@@ -212,9 +228,7 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 	if (result) {
 		Serial.print(F("Subscribed with new SID "));
 		Serial.println(newSID);
-		displayState = DS_ACTIVE;
-		displayActiveSubState = DASS_HIDING;
-		lastStateChangeMillis = millis();
+		setDisplayActive(DASS_HIDING);
 	} else {
 		Serial.println(F("Subscription failed"));
 	}
@@ -258,8 +272,7 @@ void initializeSubscription() {
 }
 
 void destroySubscription() {
-	displayState = DS_INACTIVE;
-	lastStateChangeMillis = millis();
+	setDisplayInactive();
 
 	if (eventServer) {
 		eventServer->unsubscribeAll();
@@ -277,8 +290,7 @@ void initializeEventServer() {
 }
 
 void destroyEventServer() {
-	displayState = DS_INACTIVE;
-	lastStateChangeMillis = millis();
+	setDisplayInactive();
 
 	if (eventServer) {
 		Serial.println("destroying EventServer on WiFi disconnect");
@@ -293,17 +305,10 @@ void updateDisplay() {
 	static int16_t colorCycleLedOffset = -1;
 	static int16_t updateCycleLedOffset = -1;
 
-	if (displayState == DS_ACTIVE && displayActiveSubState == DASS_SHOWING_VOLUME
+	if (((displayState == DS_ACTIVE && displayActiveSubState == DASS_SHOWING_VOLUME)
+			|| (displayState == DS_UPDATING && displayUpdatingSubState == DUSS_UPDATE_FAILED))
 			&& millis() - lastStateChangeMillis > 2000) {
-		displayActiveSubState = DASS_HIDING;
-		lastStateChangeMillis = millis();
-	}
-
-	if (displayState == DS_UPDATING && displayUpdatingSubState == DUSS_UPDATE_FAILED
-			&& millis() - lastStateChangeMillis > 2000) {
-		displayState = DS_ACTIVE;
-		displayActiveSubState = DASS_HIDING;
-		lastStateChangeMillis = millis();
+		setDisplayActive(DASS_HIDING);
 	}
 
 	if (displayState != DS_INACTIVE) {
@@ -452,19 +457,9 @@ void setup() {
 	connectWiFi();
 
 	// start web server for configuration
-	configServer.onBeforeUpdate([]() {
-		displayState = DS_UPDATING;
-		displayUpdatingSubState = DUSS_UPDATE_IN_PROGRESS;
-		lastStateChangeMillis = millis();
-	});
-	configServer.onAfterSuccessfulUpdate([]() {
-		displayUpdatingSubState = DUSS_UPDATE_SUCCESSFUL;
-		lastStateChangeMillis = millis();
-	});
-	configServer.onAfterFailedUpdate([]() {
-		displayUpdatingSubState = DUSS_UPDATE_FAILED;
-		lastStateChangeMillis = millis();
-	});
+	configServer.onBeforeUpdate(std::bind(setDisplayUpdating, DUSS_UPDATE_IN_PROGRESS));
+	configServer.onAfterSuccessfulUpdate(std::bind(setDisplayUpdating, DUSS_UPDATE_SUCCESSFUL));
+	configServer.onAfterFailedUpdate(std::bind(setDisplayUpdating, DUSS_UPDATE_FAILED));
 	configServer.onBeforeNetworkConfigChange(destroyEventServer);
 	configServer.onAfterNetworkConfigChange(connectWiFi);
 	configServer.onBeforeSonosConfigChange(destroySubscription);
