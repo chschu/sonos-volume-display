@@ -239,8 +239,6 @@ void connectWiFi() {
 }
 
 void initializeSubscription() {
-	lastStateChangeMillis = millis();
-
 	const Config::SonosConfig &sonosConfig = config.sonos();
 	if (sonosConfig.active() && eventServer) {
 		Sonos::Discover discover;
@@ -455,13 +453,6 @@ void setup() {
 
 	// start web server for configuration
 	configServer.onBeforeUpdate([]() {
-		displayState = DS_UPDATING;
-		displayUpdatingSubState = DUSS_UPDATE_IN_PROGRESS;
-		lastStateChangeMillis = millis();
-	});
-	static unsigned int prevBlock = 0;
-	configServer.onBeforeUpdate([]() {
-		prevBlock = 0;
 		displayState = DS_UPDATING;
 		displayUpdatingSubState = DUSS_UPDATE_IN_PROGRESS;
 		lastStateChangeMillis = millis();
