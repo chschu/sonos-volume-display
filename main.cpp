@@ -42,11 +42,7 @@ const uint16_t LED_COUNT = 24;
 const uint8_t LED_PIN = D1;
 const CRGB LED_CORRECTION = TypicalSMD5050;
 const CRGB LED_TEMPERATURE = Tungsten100W;
-const uint8_t LED_BRIGHTNESS = 255;
 const float LED_GAMMA = 2.2;
-
-// transformation to apply to volume values; input in [0,1], output in [0,1]
-const std::function<float(float)> DISPLAY_TRANSFORMATION = [](float x) -> float {return 1.0 - pow(1.0 - x, 2.0);};
 
 Config::PersistentConfig config;
 Config::Server configServer(config);
@@ -300,6 +296,33 @@ void destroyEventServer() {
 	}
 }
 
+void configLeds() {
+	const Config::LedConfig &ledConfig = config.led();
+	FastLED.setBrightness(ledConfig.brightness());
+
+	// show volume to visualize the brightness change
+	if (displayState == DS_ACTIVE && displayActiveSubState == DASS_HIDING) {
+		setDisplayActive(DASS_SHOWING_VOLUME);
+	}
+}
+
+// transform volume value in [0,1] to display value [0,1]
+float transform(float volume) {
+	switch (config.led().transform()) {
+	case Config::LedConfig::Transform::IDENTITY:
+		return volume;
+	case Config::LedConfig::Transform::SQUARE:
+		return volume * volume;
+	case Config::LedConfig::Transform::SQUARE_ROOT:
+		return sqrt(volume);
+	case Config::LedConfig::Transform::INVERSE_SQUARE:
+		return volume * (2.0 - volume);
+	}
+
+	Serial.println(F("unknown transformation"));
+	return 0;
+}
+
 void updateDisplay() {
 	static int16_t colorCycleOffset = -1;
 	static int16_t colorCycleLedOffset = -1;
@@ -345,7 +368,7 @@ void updateDisplay() {
 		if (displayActiveSubState == DASS_SHOWING_VOLUME || displayActiveSubState == DASS_SHOWING_MUTE) {
 			FastLED.clear();
 
-			float leftLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(current.master * current.lf / 10000.0);
+			float leftLed = LED_COUNT / 2 * transform(current.master * current.lf / 10000.0);
 			uint16_t leftLedInt = floor(leftLed);
 			float leftLedFrac = leftLed - leftLedInt;
 			for (uint16_t i = 0; i < leftLedInt; i++) {
@@ -359,7 +382,7 @@ void updateDisplay() {
 				leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
 			}
 
-			float rightLed = LED_COUNT / 2 * DISPLAY_TRANSFORMATION(current.master * current.rf / 10000.0);
+			float rightLed = LED_COUNT / 2 * transform(current.master * current.rf / 10000.0);
 			uint16_t rightLedInt = floor(rightLed);
 			float rightLedFrac = rightLed - rightLedInt;
 			for (uint16_t i = 0; i < rightLedInt; i++) {
@@ -445,13 +468,15 @@ void setup() {
 	FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, LED_COUNT);
 	FastLED.setCorrection(LED_CORRECTION);
 	FastLED.setTemperature(LED_TEMPERATURE);
-	FastLED.setBrightness(LED_BRIGHTNESS);
-
-	// start display update ticker
-	displayUpdateTicker.attach_ms(40, updateDisplay);
 
 	// load configuration from EEPROM
 	config.load();
+
+	// apply LED config
+	configLeds();
+
+	// start display update ticker
+	displayUpdateTicker.attach_ms(40, updateDisplay);
 
 	// enable WiFi and start connecting
 	connectWiFi();
@@ -464,6 +489,7 @@ void setup() {
 	configServer.onAfterNetworkConfigChange(connectWiFi);
 	configServer.onBeforeSonosConfigChange(destroySubscription);
 	configServer.onAfterSonosConfigChange(initializeSubscription);
+	configServer.onAfterLedConfigChange(configLeds);
 	configServer.begin();
 }
 

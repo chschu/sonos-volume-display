@@ -2,9 +2,9 @@
 
 #include <EEPROM.h>
 #include <HardwareSerial.h>
-#include <stddef.h>
 #include <WString.h>
 #include <Arduino.h>
+#include <cstddef>
 
 namespace Config {
 
@@ -18,6 +18,10 @@ NetworkConfig PersistentConfig::network() {
 
 SonosConfig PersistentConfig::sonos() {
 	return SonosConfig(_data.sonos);
+}
+
+LedConfig PersistentConfig::led() {
+	return LedConfig(_data.led);
 }
 
 static uint32_t crc32(const void *data, size_t length) {
@@ -64,7 +68,7 @@ void PersistentConfig::save() {
 }
 
 bool PersistentConfig::reset() {
-	return network().reset() && sonos().reset();
+	return network().reset() && sonos().reset() && led().reset();
 }
 
 } /* namespace Config */

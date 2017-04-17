@@ -1,6 +1,8 @@
+// must be included before "max" is defined, which breaks (std::numeric_limits<...>::max)()
+#include <limits>
+
 #include "Server.h"
 
-#include <Arduino.h>
 #include <Esp.h>
 #include <ESP8266WiFi.h>
 #include <HardwareSerial.h>
@@ -9,8 +11,10 @@
 #include "../JSON/Builder.h"
 #include "../Sonos/Discover.h"
 #include "../Sonos/ZoneGroupTopology.h"
+
 #include "NetworkConfig.h"
 #include "SonosConfig.h"
+#include "LedConfig.h"
 
 namespace Config {
 
@@ -29,6 +33,8 @@ void Server::begin() {
 	_server.on("/api/config/network", HTTP_POST, std::bind(&Server::_handlePostApiConfigNetwork, this));
 	_server.on("/api/config/sonos", HTTP_GET, std::bind(&Server::_handleGetApiConfigSonos, this));
 	_server.on("/api/config/sonos", HTTP_POST, std::bind(&Server::_handlePostApiConfigSonos, this));
+	_server.on("/api/config/led", HTTP_GET, std::bind(&Server::_handleGetApiConfigLed, this));
+	_server.on("/api/config/led", HTTP_POST, std::bind(&Server::_handlePostApiConfigLed, this));
 	_server.on("/api/update", HTTP_POST, std::bind(&Server::_handlePostApiUpdate, this),
 			std::bind(&Server::_handlePostApiUpdateUpload, this));
 	_server.begin();
@@ -68,6 +74,14 @@ void Server::onBeforeSonosConfigChange(Callback callback) {
 
 void Server::onAfterSonosConfigChange(Callback callback) {
 	_afterSonosConfigChangeCallback = callback;
+}
+
+void Server::onBeforeLedConfigChange(Callback callback) {
+	_beforeLedConfigChangeCallback = callback;
+}
+
+void Server::onAfterLedConfigChange(Callback callback) {
+	_afterLedConfigChangeCallback = callback;
 }
 
 void Server::_handleGetApiDiscoverNetworks() {
@@ -177,6 +191,35 @@ void Server::_handlePostApiConfigSonos() {
 	}
 }
 
+void Server::_handleGetApiConfigLed() {
+	_sendResponseLed(200);
+}
+
+void Server::_handlePostApiConfigLed() {
+	PersistentConfig copy = _config;
+	LedConfig ledConfig = copy.led();
+
+	if (_handleArg(F("brightness"), ledConfig, &LedConfig::setBrightness)
+			&& _handleArg(F("transform"), ledConfig, &LedConfig::setTransform)) {
+		if (_beforeLedConfigChangeCallback) {
+			_beforeLedConfigChangeCallback();
+		}
+
+		// copy modifications back and save
+		_config = copy;
+		_config.save();
+
+		_sendResponseLed(200);
+
+		if (_afterLedConfigChangeCallback) {
+			_afterLedConfigChangeCallback();
+		}
+	} else {
+		_sendResponseLed(400);
+	}
+}
+
+
 void Server::_sendResponseNetwork(int code) {
 	const NetworkConfig &networkConfig = _config.network();
 
@@ -200,6 +243,7 @@ void Server::_sendResponseNetwork(int code) {
 
 	_server.send(code, F("application/json; charset=utf-8"), json.toString());
 }
+
 void Server::_sendResponseSonos(int code) {
 	const SonosConfig &sonosConfig = _config.sonos();
 
@@ -211,6 +255,40 @@ void Server::_sendResponseSonos(int code) {
 
 	_server.send(code, F("application/json; charset=utf-8"), json.toString());
 }
+
+void Server::_sendResponseLed(int code) {
+	const LedConfig &ledConfig = _config.led();
+
+	JSON::Builder json;
+	json.beginObject();
+	json.attribute(F("brightness"), ledConfig.brightness());
+	json.attribute(F("transform"), ledConfig.transform());
+	json.attribute(F("status"));
+	json.beginObject();
+	String transformName;
+	switch (ledConfig.transform()) {
+	case LedConfig::Transform::IDENTITY:
+		transformName = F("IDENTITY");
+		break;
+	case LedConfig::Transform::SQUARE:
+		transformName = F("SQUARE");
+		break;
+	case LedConfig::Transform::SQUARE_ROOT:
+		transformName = F("SQUARE_ROOT");
+		break;
+	case LedConfig::Transform::INVERSE_SQUARE:
+		transformName = F("INVERSE_SQUARE");
+		break;
+	default:
+		transformName = F("???");
+	}
+	json.attribute(F("transform-name"), transformName);
+	json.endObject();
+	json.endObject();
+
+	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+}
+
 
 void Server::_handlePostApiUpdate() {
 	bool success = !Update.hasError();
@@ -296,6 +374,39 @@ bool Server::_convert(const String &input, bool *output) {
 template<>
 bool Server::_convert(const String &input, const char **output) {
 	*output = input.c_str();
+	return true;
+}
+
+template<typename UINT_TYPE>
+bool Server::_convert(const String &input, UINT_TYPE *output) {
+	UINT_TYPE result = 0;
+	const UINT_TYPE maxValue = (std::numeric_limits<UINT_TYPE>::max)();
+	for (const char *p = input.c_str(); *p; p++) {
+		if (!isdigit(*p)) {
+			return false;
+		}
+		if (result > (maxValue - (*p - '0')) / 10) {
+			return false;
+		}
+		result = 10 * result + (*p - '0');
+	}
+	*output = result;
+	return true;
+}
+
+template<>
+bool Server::_convert(const String &input, LedConfig::Transform *output) {
+	if (input == String(LedConfig::Transform::IDENTITY)) {
+		*output = LedConfig::Transform::IDENTITY;
+	} else if (input == String(LedConfig::Transform::SQUARE)) {
+		*output = LedConfig::Transform::SQUARE;
+	} else if (input == String(LedConfig::Transform::SQUARE_ROOT)) {
+		*output = LedConfig::Transform::SQUARE_ROOT;
+	} else if (input == String(LedConfig::Transform::INVERSE_SQUARE)) {
+		*output = LedConfig::Transform::INVERSE_SQUARE;
+	} else {
+		return false;
+	}
 	return true;
 }
 

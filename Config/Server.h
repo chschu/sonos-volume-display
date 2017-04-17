@@ -37,6 +37,10 @@ public:
 	void onBeforeSonosConfigChange(Callback callback);
 	void onAfterSonosConfigChange(Callback callback);
 
+	// set LED Configuration change callbacks
+	void onBeforeLedConfigChange(Callback callback);
+	void onAfterLedConfigChange(Callback callback);
+
 private:
 	PersistentConfig &_config;
 
@@ -52,17 +56,25 @@ private:
 	Callback _beforeSonosConfigChangeCallback;
 	Callback _afterSonosConfigChangeCallback;
 
+	Callback _beforeLedConfigChangeCallback;
+	Callback _afterLedConfigChangeCallback;
+
 	void _handleGetApiDiscoverNetworks();
 	void _handleGetApiDiscoverRooms();
+
 	void _handleGetApiConfigNetwork();
 	void _handlePostApiConfigNetwork();
 	void _handleGetApiConfigSonos();
 	void _handlePostApiConfigSonos();
+	void _handleGetApiConfigLed();
+	void _handlePostApiConfigLed();
+
 	void _handlePostApiUpdate();
 	void _handlePostApiUpdateUpload();
 
 	void _sendResponseNetwork(int code);
 	void _sendResponseSonos(int code);
+	void _sendResponseLed(int code);
 
 	// extract the request argument, call a specialization of _convert(), and pass the result to the setter
 	template<typename C, typename T>

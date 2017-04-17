@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+#include "LedConfig.h"
 #include "NetworkConfig.h"
 #include "SonosConfig.h"
 
@@ -14,14 +15,16 @@ public:
 		uint32_t magic;
 		NetworkConfig::Data network;
 		SonosConfig::Data sonos;
+		LedConfig::Data led;
 		uint32_t checksum;
 	};
 
 	PersistentConfig(uint32_t magic = 0x51DEB00B);
 
 	// "views" with validating setters, working on the actual configuration data
-	SonosConfig sonos();
 	NetworkConfig network();
+	SonosConfig sonos();
+	LedConfig led();
 
 	// (re-)load configuration from EEPROM
 	// if magic number or checksum don't match, initialize defaults and store in EEPROM
