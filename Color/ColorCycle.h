@@ -2,9 +2,9 @@
 #define COLOR_COLORCYCLE_H_
 
 #include <cstdint>
-#include <memory>
 
 #include "Pattern.h"
+#include "RGB.h"
 
 namespace Color {
 
@@ -16,7 +16,9 @@ public:
 
 private:
 	uint16_t _length;
-	std::unique_ptr<RGB[]> _colors;
+	uint16_t _rOffset;
+	uint16_t _gOffset;
+	uint16_t _bOffset;
 };
 
 } /* namespace Color */
