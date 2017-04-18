@@ -79,19 +79,19 @@ void Builder::_quoted(const String &x) {
 			_json += *p;
 			break;
 		case '\b':
-			_json += "\\b";
+			_json += '\\b';
 			break;
 		case '\t':
-			_json += "\\t";
+			_json += '\\t';
 			break;
 		case '\n':
-			_json += "\\n";
+			_json += '\\n';
 			break;
 		case '\f':
-			_json += "\\f";
+			_json += '\\f';
 			break;
 		case '\r':
-			_json += "\\r";
+			_json += '\\r';
 			break;
 		default:
 			if (*p < ' ') {
