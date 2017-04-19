@@ -38,6 +38,11 @@ void Builder::value(int x) {
 	_json += x;
 }
 
+void Builder::value(unsigned int x) {
+	_separator();
+	_json += x;
+}
+
 void Builder::value(bool x) {
 	_separator();
 	_json += x ? F("true") : F("false");

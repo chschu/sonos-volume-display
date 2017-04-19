@@ -27,6 +27,7 @@ Server::Server(PersistentConfig &config, uint16_t port) :
 }
 
 void Server::begin() {
+	_server.on("/api/info", HTTP_GET, std::bind(&Server::_handleGetApiInfo, this));
 	_server.on("/api/discover/networks", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverNetworks, this));
 	_server.on("/api/discover/rooms", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverRooms, this));
 	_server.on("/api/config/network", HTTP_GET, std::bind(&Server::_handleGetApiConfigNetwork, this));
@@ -82,6 +83,32 @@ void Server::onBeforeLedConfigChange(Callback callback) {
 
 void Server::onAfterLedConfigChange(Callback callback) {
 	_afterLedConfigChangeCallback = callback;
+}
+
+void Server::_handleGetApiInfo() {
+	JSON::Builder json;
+	json.beginObject();
+	json.attribute(F("boot-mode"), ESP.getBootMode());
+	json.attribute(F("boot-version"), ESP.getBootVersion());
+	json.attribute(F("chip-id"), ESP.getChipId());
+	json.attribute(F("core-version"), ESP.getCoreVersion());
+	json.attribute(F("cpu-freq-mhz"), ESP.getCpuFreqMHz());
+	json.attribute(F("cycle-count"), ESP.getCycleCount());
+	json.attribute(F("flash-chip-id"), ESP.getFlashChipId());
+	json.attribute(F("flash-chip-mode"), ESP.getFlashChipMode());
+	json.attribute(F("flash-chip-real-size"), ESP.getFlashChipRealSize());
+	json.attribute(F("flash-chip-size"), ESP.getFlashChipSize());
+	json.attribute(F("flash-chip-size-by-chip-id"), ESP.getFlashChipSizeByChipId());
+	json.attribute(F("flash-chip-speed"), ESP.getFlashChipSpeed());
+	json.attribute(F("free-heap"), ESP.getFreeHeap());
+	json.attribute(F("free-sketch-space"), ESP.getFreeSketchSpace());
+	json.attribute(F("reset-info"), ESP.getResetInfo());
+	json.attribute(F("reset-reason"), ESP.getResetReason());
+	json.attribute(F("sdk-version"), ESP.getSdkVersion());
+	json.attribute(F("sketch-md5"), ESP.getSketchMD5());
+	json.attribute(F("sketch-size"), ESP.getSketchSize());
+	json.endObject();
+	_server.send(200, F("application/json; charset=utf-8"), json.toString());
 }
 
 void Server::_handleGetApiDiscoverNetworks() {
@@ -219,7 +246,6 @@ void Server::_handlePostApiConfigLed() {
 	}
 }
 
-
 void Server::_sendResponseNetwork(int code) {
 	const NetworkConfig &networkConfig = _config.network();
 
@@ -288,7 +314,6 @@ void Server::_sendResponseLed(int code) {
 
 	_server.send(code, F("application/json; charset=utf-8"), json.toString());
 }
-
 
 void Server::_handlePostApiUpdate() {
 	bool success = !Update.hasError();

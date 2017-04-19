@@ -59,6 +59,8 @@ private:
 	Callback _beforeLedConfigChangeCallback;
 	Callback _afterLedConfigChangeCallback;
 
+	void _handleGetApiInfo();
+
 	void _handleGetApiDiscoverNetworks();
 	void _handleGetApiDiscoverRooms();
 
