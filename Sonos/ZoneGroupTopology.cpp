@@ -68,7 +68,7 @@ bool ZoneGroupTopology::GetZoneGroupState_Decoded(ZoneInfoCallback callback, boo
 						}
 						int playerIPStart = location.indexOf(F("//"));
 						if (playerIPStart < 0) {
-							Serial.println(F("Failed to find end of player IP in Location"));
+							Serial.println(F("Failed to find start of player IP in Location"));
 							return false;
 						}
 						playerIPStart += 2;
