@@ -6,11 +6,10 @@
 #include <pgmspace.h>
 #include <Print.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <WiFiUdp.h>
 #include <WString.h>
-#include <cstdint>
 #include <cstring>
+#include <memory>
 
 namespace UPnP {
 
@@ -39,13 +38,11 @@ bool Discover::all(Callback callback, const char *st, uint8_t mx, unsigned long 
 	}
 
 	size_t size = sizeof(DISCOVER_MSEARCH) + (3 * sizeof(mx) - 2) + (strlen(st) - 2);
-	char *buf = (char *) malloc(size);
-	snprintf_P(buf, size, DISCOVER_MSEARCH, mx, st);
+	std::unique_ptr<char[]> buf(new char[size]);
+	snprintf_P(buf.get(), size, DISCOVER_MSEARCH, mx, st);
 
 	// send the M-SEARCH request packet
-	udp.write(buf);
-
-	free(buf);
+	udp.write(buf.get());
 
 	if (!udp.endPacket()) {
 		Serial.println(F("udp.endPacket failed"));

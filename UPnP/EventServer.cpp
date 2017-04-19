@@ -140,12 +140,10 @@ const char NOTIFY_RESPONSE[] PROGMEM = "HTTP/1.1 %u %s\r\n\r\n";
 
 static void sendResponse(WiFiClient &client, uint16_t statusCode, String statusText) {
 	size_t size = sizeof(NOTIFY_RESPONSE) + (3 * sizeof(statusCode) - 2) + (statusText.length() - 2);
-	char *buf = (char *) malloc(size);
-	snprintf_P(buf, size, NOTIFY_RESPONSE, statusCode, statusText.c_str());
+	std::unique_ptr<char[]> buf(new char[size]);
+	snprintf_P(buf.get(), size, NOTIFY_RESPONSE, statusCode, statusText.c_str());
 
-	client.write((const char *) buf);
-
-	free(buf);
+	client.write(buf.get());
 
 	client.stop();
 }

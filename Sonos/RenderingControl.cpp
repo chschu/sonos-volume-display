@@ -28,15 +28,13 @@ RenderingControl::RenderingControl(IPAddress deviceIP) :
 
 bool RenderingControl::GetVolume(GetVolumeCallback callback, uint32_t instanceID, const char *channel) {
 	size_t size = sizeof(GET_VOLUME) + (3 * sizeof(instanceID) - 2) + (strlen(channel) - 2);
-	char *buf = (char *) malloc(size);
-	snprintf_P(buf, size, GET_VOLUME, instanceID, channel);
+	std::unique_ptr<char[]> buf(new char[size]);
+	snprintf_P(buf.get(), size, GET_VOLUME, instanceID, channel);
 
 	HTTPClient client;
 	client.begin(_deviceIP.toString(), 1400, F("/MediaRenderer/RenderingControl/Control"));
 	client.addHeader(F("SOAPACTION"), F("urn:schemas-upnp-org:service:RenderingControl:1#GetVolume"));
-	int status = client.POST((uint8_t *) buf, strlen(buf));
-
-	free(buf);
+	int status = client.POST(String(buf.get()));
 
 	bool result = false;
 
