@@ -251,9 +251,8 @@ void connectWiFi() {
 void initializeSubscription() {
 	const Config::SonosConfig &sonosConfig = config.sonos();
 	if (sonosConfig.active() && eventServer) {
-		Sonos::Discover discover;
 		IPAddress addr;
-		if (discover.discoverAny(&addr)) {
+		if (Sonos::Discover::any(&addr)) {
 			Serial.print(F("Found a device: "));
 			Serial.println(addr);
 

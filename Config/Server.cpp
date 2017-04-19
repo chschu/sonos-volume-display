@@ -110,7 +110,7 @@ void Server::_handleGetApiDiscoverNetworks() {
 
 void Server::_handleGetApiDiscoverRooms() {
 	IPAddress addr;
-	if (Sonos::Discover().discoverAny(&addr)) {
+	if (Sonos::Discover::any(&addr)) {
 		Sonos::ZoneGroupTopology topo(addr);
 
 		JSON::Builder json;

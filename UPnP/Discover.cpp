@@ -21,7 +21,7 @@ const char DISCOVER_MSEARCH[] PROGMEM = "M-SEARCH * HTTP/1.1\r\n"
 		"ST: %s\r\n"
 		"\r\n";
 
-bool Discover::discover(Callback callback, const char *st, uint8_t mx, unsigned long timeoutMillis) {
+bool Discover::all(Callback callback, const char *st, uint8_t mx, unsigned long timeoutMillis) {
 	WiFiUDP udp;
 
 	// start UDP connection on a random port

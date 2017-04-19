@@ -17,7 +17,7 @@ public:
 	// for every response received within the timeout, the callback is invoked
 	// if the callback returns false, discovery is terminated
 	// returns false if discovery failed; not receiving any response is NOT considered a failure
-	bool discover(Callback callback, const char *st, uint8_t mx = 4, unsigned long timeoutMillis = 5000);
+	static bool all(Callback callback, const char *st, uint8_t mx = 4, unsigned long timeoutMillis = 5000);
 };
 
 }

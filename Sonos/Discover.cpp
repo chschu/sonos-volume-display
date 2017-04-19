@@ -6,9 +6,9 @@
 
 namespace Sonos {
 
-bool Discover::discoverAny(IPAddress *deviceIP, unsigned long timeoutMillis) {
+bool Discover::any(IPAddress *deviceIP, unsigned long timeoutMillis) {
 	bool deviceFound = false;
-	return UPnP::Discover().discover([&deviceFound, deviceIP](IPAddress remoteIP, Stream &stream) -> bool {
+	return UPnP::Discover::all([&deviceFound, deviceIP](IPAddress remoteIP, Stream &stream) -> bool {
 		if (!stream.find("Sonos", 5)) {
 			// this is not a Sonos response; wait for the next one
 			return true;
@@ -22,4 +22,4 @@ bool Discover::discoverAny(IPAddress *deviceIP, unsigned long timeoutMillis) {
 	}, "urn:schemas-upnp-org:device:ZonePlayer:1", 1) && deviceFound;
 }
 
-}
+} /* namepsace Sonos */
