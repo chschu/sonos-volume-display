@@ -27,6 +27,7 @@
 #include "Color/ColorCycle.h"
 #include "Color/Gradient.h"
 #include "Color/RGB.h"
+#include "Config/LedConfig.h"
 #include "Config/NetworkConfig.h"
 #include "Config/PersistentConfig.h"
 #include "Config/Server.h"
