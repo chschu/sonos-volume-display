@@ -37,7 +37,7 @@
 #include "UPnP/EventServer.h"
 #include "XML/Utilities.h"
 
-const String HOSTNAME = String("svd-") + String(ESP.getChipId(), 16);
+const String AP_SSID = String("svd-") + String(ESP.getChipId(), 16);
 
 const uint16_t LED_COUNT = 24;
 const uint8_t LED_PIN = D1;
@@ -82,7 +82,7 @@ Ticker displayUpdateTicker;
 
 unsigned long lastStateChangeMillis = 0;
 
-typedef struct VolumeState {
+struct VolumeState {
 	int8_t master, lf, rf, mute;
 
 	void reset() {
@@ -235,13 +235,13 @@ void connectWiFi() {
 	const Config::NetworkConfig &networkConfig = config.network();
 
 	WiFi.mode(WIFI_AP);
-	WiFi.softAP(HOSTNAME.c_str(), "q1w2e3r4");
+	WiFi.softAP(AP_SSID.c_str(), "q1w2e3r4");
 	WiFi.setAutoConnect(true);
 	WiFi.setAutoReconnect(true);
 
 	if (networkConfig.ssid() != "") {
 		WiFi.enableSTA(true);
-		WiFi.hostname(HOSTNAME);
+		WiFi.hostname(networkConfig.hostname());
 		WiFi.begin(networkConfig.ssid(), networkConfig.passphrase());
 	} else {
 		WiFi.enableSTA(false);

@@ -1,6 +1,8 @@
 #include "NetworkConfig.h"
 
 #include <cstring>
+#include <Esp.h>
+#include <WString.h>
 
 namespace Config {
 
@@ -37,8 +39,30 @@ bool NetworkConfig::setPassphrase(const char *passphrase) {
 	return true;
 }
 
+const char *NetworkConfig::hostname() const {
+	return _data.hostname;
+}
+
+bool NetworkConfig::setHostname(const char *hostname) {
+	size_t len = strlen(hostname);
+	if (len < 1 || len >= sizeof(_data.hostname)) {
+		return false;
+	}
+	for (const char *p = hostname; *p; p++) {
+		if (!isalnum(*p) && *p != '-') {
+			return false;
+		}
+	}
+	if (hostname[0] == '-' || hostname[len - 1] == '-') {
+		return false;
+	}
+	strcpy(_data.hostname, hostname);
+	return true;
+}
+
 bool NetworkConfig::reset() {
-	return setSsid("") && setPassphrase("");
+	String defaultHostname = String(F("svd-")) + String(ESP.getChipId(), 16);
+	return setSsid("") && setPassphrase("") && setHostname(defaultHostname.c_str());
 }
 
 } /* namespace Config */

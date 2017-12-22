@@ -8,6 +8,7 @@ public:
 	typedef struct Data {
 		char ssid[32];
 		char passphrase[64];
+		char hostname[33];
 	};
 
 	NetworkConfig(Data &data);
@@ -17,6 +18,9 @@ public:
 
 	const char *passphrase() const;
 	bool setPassphrase(const char *passphrase);
+
+	const char *hostname() const;
+	bool setHostname(const char *hostname);
 
 	bool reset();
 

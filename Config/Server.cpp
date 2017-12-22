@@ -170,7 +170,8 @@ void Server::_handlePostApiConfigNetwork() {
 	NetworkConfig networkConfig = copy.network();
 
 	if (_handleArg(F("ssid"), networkConfig, &NetworkConfig::setSsid)
-			&& _handleArg(F("passphrase"), networkConfig, &NetworkConfig::setPassphrase)) {
+			&& _handleArg(F("passphrase"), networkConfig, &NetworkConfig::setPassphrase)
+			&& _handleArg(F("hostname"), networkConfig, &NetworkConfig::setHostname)) {
 
 		if (_beforeNetworkConfigChangeCallback) {
 			_beforeNetworkConfigChangeCallback();
@@ -253,6 +254,7 @@ void Server::_sendResponseNetwork(int code) {
 	json.beginObject();
 	json.attribute(F("ssid"), networkConfig.ssid());
 	json.attribute(F("passphrase"), F("********"));
+	json.attribute(F("hostname"), networkConfig.hostname());
 	json.attribute(F("status"));
 	json.beginObject();
 	json.attribute(F("connected"), WiFi.isConnected());
