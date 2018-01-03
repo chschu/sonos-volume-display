@@ -317,10 +317,10 @@ float transform(float volume) {
 		return sqrt(volume);
 	case Config::LedConfig::Transform::INVERSE_SQUARE:
 		return volume * (2.0 - volume);
+	default:
+		Serial.println(F("unknown transformation, using IDENTITY"));
+		return volume;
 	}
-
-	Serial.println(F("unknown transformation"));
-	return 0;
 }
 
 void updateDisplay() {

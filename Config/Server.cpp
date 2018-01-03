@@ -291,26 +291,27 @@ void Server::_sendResponseLed(int code) {
 	json.beginObject();
 	json.attribute(F("brightness"), ledConfig.brightness());
 	json.attribute(F("transform"), ledConfig.transform());
-	json.attribute(F("status"));
+	json.attribute(F("choices"));
 	json.beginObject();
-	String transformName;
-	switch (ledConfig.transform()) {
-	case LedConfig::Transform::IDENTITY:
-		transformName = F("IDENTITY");
-		break;
-	case LedConfig::Transform::SQUARE:
-		transformName = F("SQUARE");
-		break;
-	case LedConfig::Transform::SQUARE_ROOT:
-		transformName = F("SQUARE_ROOT");
-		break;
-	case LedConfig::Transform::INVERSE_SQUARE:
-		transformName = F("INVERSE_SQUARE");
-		break;
-	default:
-		transformName = F("???");
-	}
-	json.attribute(F("transform-name"), transformName);
+	json.attribute(F("transform"));
+	json.beginArray();
+	json.beginObject();
+	json.attribute("id", LedConfig::Transform::IDENTITY);
+	json.attribute("name", F("IDENTITY"));
+	json.endObject();
+	json.beginObject();
+	json.attribute("id", LedConfig::Transform::SQUARE);
+	json.attribute("name", F("SQUARE"));
+	json.endObject();
+	json.beginObject();
+	json.attribute("id", LedConfig::Transform::SQUARE_ROOT);
+	json.attribute("name", F("SQUARE_ROOT"));
+	json.endObject();
+	json.beginObject();
+	json.attribute("id", LedConfig::Transform::INVERSE_SQUARE);
+	json.attribute("name", F("INVERSE_SQUARE"));
+	json.endObject();
+	json.endArray();
 	json.endObject();
 	json.endObject();
 
