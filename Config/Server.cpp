@@ -328,6 +328,8 @@ void Server::_handlePostApiUpdate() {
 
 	if (success) {
 		_server.send(200, F("application/json; charset=utf-8"), json.toString());
+		_server.client().flush();
+		_server.client().stop();
 		Serial.println("Rebooting...");
 		ESP.restart();
 	} else {
