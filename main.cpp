@@ -1,10 +1,4 @@
-#define FASTLED_ALLOW_INTERRUPTS 0
-#define FASTLED_ESP8266_RAW_PIN_ORDER
-
-#include <FastLED.h>
-#include <color.h>
-#include <colorutils.h>
-#include <pixeltypes.h>
+#include <NeoPixelBus.h>
 
 #include <Arduino.h>
 #include <Esp.h>
@@ -41,8 +35,6 @@ const String AP_SSID = String("svd-") + String(ESP.getChipId(), 16);
 
 const uint16_t LED_COUNT = 24;
 const uint8_t LED_PIN = D1;
-const CRGB LED_CORRECTION = TypicalSMD5050;
-const CRGB LED_TEMPERATURE = Tungsten100W;
 const float LED_GAMMA = 2.2;
 
 Config::PersistentConfig config;
@@ -50,10 +42,12 @@ Config::Server configServer(config);
 UPnP::EventServer *eventServer = NULL;
 Color::Gradient gradient;
 
-CRGB leds[LED_COUNT];
+NeoGamma<NeoGammaTableMethod> colorGamma;
+
+NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod> strip(LED_COUNT, LED_PIN);
 
 // color for mute
-const Color::RGB MUTE_COLOR = { 0, 0, 63 };
+const RgbColor MUTE_COLOR(0, 0, 63);
 
 // rainbow cycle for startup animation
 const uint16_t COLOR_CYCLE_LENGTH = 57;
@@ -298,7 +292,6 @@ void destroyEventServer() {
 
 void configLeds() {
 	const Config::LedConfig &ledConfig = config.led();
-	FastLED.setBrightness(ledConfig.brightness());
 
 	// show volume to visualize the brightness change
 	if (displayState == DS_ACTIVE && displayActiveSubState == DASS_HIDING) {
@@ -323,10 +316,17 @@ float transform(float volume) {
 	}
 }
 
+
+inline RgbColor toRgbColor(const Color::RGB &color) {
+	return RgbColor(color.red, color.green, color.blue);
+}
+
 void updateDisplay() {
 	static int16_t colorCycleOffset = -1;
 	static int16_t colorCycleLedOffset = -1;
 	static int16_t updateCycleLedOffset = -1;
+
+	static RgbColor leds[LED_COUNT];
 
 	if (((displayState == DS_ACTIVE && displayActiveSubState == DASS_SHOWING_VOLUME)
 			|| (displayState == DS_UPDATING && displayUpdatingSubState == DUSS_UPDATE_FAILED))
@@ -345,17 +345,16 @@ void updateDisplay() {
 	if (displayState == DS_INACTIVE) {
 		if (colorCycleLedOffset < 0) {
 			// initialize color cycle
-			FastLED.clear();
+			memset(leds, 0, sizeof(leds));
 			colorCycleLedOffset = 0;
 			colorCycleOffset = 0;
 		}
 
 		// update LEDs
 		for (int i = 0; i < LED_COUNT; i++) {
-			leds[i] = leds[i].fadeToBlackBy(20);
+			leds[i] = RgbColor::LinearBlend(leds[i], 0, 20.0/255.0);
 		}
-		Color::RGB color = COLOR_CYCLE.get(colorCycleOffset);
-		leds[colorCycleLedOffset] = applyGamma_video(CRGB(color.red, color.green, color.blue), LED_GAMMA);
+		leds[colorCycleLedOffset] = toRgbColor(COLOR_CYCLE.get(colorCycleOffset));
 
 		// update offsets
 		if (++colorCycleLedOffset == LED_COUNT) {
@@ -366,37 +365,35 @@ void updateDisplay() {
 		}
 	} else if (displayState == DS_ACTIVE) {
 		if (displayActiveSubState == DASS_SHOWING_VOLUME || displayActiveSubState == DASS_SHOWING_MUTE) {
-			FastLED.clear();
+			memset(leds, 0, sizeof(leds));
 
 			float leftLed = LED_COUNT / 2 * transform(current.master * current.lf / 10000.0);
 			uint16_t leftLedInt = floor(leftLed);
 			float leftLedFrac = leftLed - leftLedInt;
 			for (uint16_t i = 0; i < leftLedInt; i++) {
-				Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(i);
-				CRGB temp(color.red, color.green, color.blue);
-				leds[i] = applyGamma_video(temp, LED_GAMMA);
+				leds[i] = current.mute ? MUTE_COLOR : toRgbColor(gradient.get(i));
 			}
 			if (leftLedInt < LED_COUNT / 2) {
-				Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(leftLedInt);
-				CRGB temp(leftLedFrac * color.red, leftLedFrac * color.green, leftLedFrac * color.blue);
-				leds[leftLedInt] = applyGamma_video(temp, LED_GAMMA);
+				leds[leftLedInt] = RgbColor::LinearBlend(
+						0,
+						current.mute ? MUTE_COLOR : toRgbColor(gradient.get(leftLedInt)),
+								leftLedFrac);
 			}
 
 			float rightLed = LED_COUNT / 2 * transform(current.master * current.rf / 10000.0);
 			uint16_t rightLedInt = floor(rightLed);
 			float rightLedFrac = rightLed - rightLedInt;
 			for (uint16_t i = 0; i < rightLedInt; i++) {
-				Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - i);
-				CRGB temp(color.red, color.green, color.blue);
-				leds[LED_COUNT - 1 - i] = applyGamma_video(temp, LED_GAMMA);
+				leds[LED_COUNT - 1 - i] = current.mute ? MUTE_COLOR : toRgbColor(gradient.get(LED_COUNT - 1 - i));
 			}
 			if (rightLedInt < LED_COUNT / 2) {
-				Color::RGB color = current.mute ? MUTE_COLOR : gradient.get(LED_COUNT - 1 - rightLedInt);
-				CRGB temp(rightLedFrac * color.red, rightLedFrac * color.green, rightLedFrac * color.blue);
-				leds[LED_COUNT - 1 - rightLedInt] = applyGamma_video(temp, LED_GAMMA);
+				leds[LED_COUNT - 1 - rightLedInt] = RgbColor::LinearBlend(
+						0,
+						current.mute ? MUTE_COLOR : toRgbColor(gradient.get(LED_COUNT - 1 - rightLedInt)),
+								rightLedFrac);
 			}
 		} else if (displayActiveSubState == DASS_HIDING) {
-			FastLED.clear();
+			memset(leds, 0, sizeof(leds));
 		} else {
 			Serial.print(F("unknown display active sub-state: "));
 			Serial.println(displayActiveSubState);
@@ -405,16 +402,16 @@ void updateDisplay() {
 		if (displayUpdatingSubState == DUSS_UPDATE_IN_PROGRESS) {
 			if (updateCycleLedOffset < 0) {
 				// initialize update cycle
-				FastLED.clear();
+				memset(leds, 0, sizeof(leds));
 				updateCycleLedOffset = 0;
 			}
 
 			// update LEDs
 			for (int i = 0; i < LED_COUNT; i++) {
-				leds[i] = leds[i].fadeToBlackBy(40);
+				leds[i] = RgbColor::LinearBlend(leds[i], 0, 40.0/255.0);
 			}
-			leds[updateCycleLedOffset] = applyGamma_video(CRGB(255, 255, 0), LED_GAMMA);
-			leds[(updateCycleLedOffset + LED_COUNT / 2) % LED_COUNT] = applyGamma_video(CRGB(255, 0, 255), LED_GAMMA);
+			leds[updateCycleLedOffset] = RgbColor(255, 255, 0);
+			leds[(updateCycleLedOffset + LED_COUNT / 2) % LED_COUNT] = RgbColor(255, 0, 255);
 
 			/* update offsets */
 			if (++updateCycleLedOffset == LED_COUNT) {
@@ -422,15 +419,11 @@ void updateDisplay() {
 			}
 		} else if (displayUpdatingSubState == DUSS_UPDATE_SUCCESSFUL) {
 			for (uint16_t i = 0; i < LED_COUNT; i++) {
-				Color::RGB color = { 0, 255, 0 };
-				CRGB temp(color.red, color.green, color.blue);
-				leds[i] = applyGamma_video(temp, LED_GAMMA);
+				leds[i] = RgbColor(0, 255, 0);
 			}
 		} else if (displayUpdatingSubState == DUSS_UPDATE_FAILED) {
 			for (uint16_t i = 0; i < LED_COUNT; i++) {
-				Color::RGB color = { 255, 0, 0 };
-				CRGB temp(color.red, color.green, color.blue);
-				leds[i] = applyGamma_video(temp, LED_GAMMA);
+				leds[i] = RgbColor(255, 0, 0);
 			}
 		} else {
 			Serial.print(F("unknown display updating sub-state: "));
@@ -441,7 +434,12 @@ void updateDisplay() {
 		Serial.println(displayState);
 	}
 
-	FastLED.show();
+	const Config::LedConfig &ledConfig = config.led();
+	for (int i = 0; i < LED_COUNT; i++) {
+		strip.SetPixelColor(i, colorGamma.Correct(RgbColor::LinearBlend(0, leds[i], ledConfig.brightness() / 255.0)));
+	}
+
+	strip.Show();
 }
 
 void setup() {
@@ -464,10 +462,7 @@ void setup() {
 	gradient.set(3 * LED_COUNT / 4, yellow);
 	gradient.set(4 * LED_COUNT / 4 - 1, green);
 
-	// initialize LEDs
-	FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, LED_COUNT);
-	FastLED.setCorrection(LED_CORRECTION);
-	FastLED.setTemperature(LED_TEMPERATURE);
+	strip.Begin();
 
 	// load configuration from EEPROM
 	config.load();
