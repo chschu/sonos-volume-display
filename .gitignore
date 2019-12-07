@@ -1,12 +1,7 @@
-# Eclipse
-/.cproject
-/.project
-/.settings/
+# PlatformIO
+/.pio/
+/.vscode/
 
-# Eclipse C++ IDE for Arduino
-/build/
+# macOS
+.DS_Store
 
-# Sloeber
-/Release/
-/core/
-/libraries/

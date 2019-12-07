@@ -8,17 +8,10 @@
 
 namespace XML {
 
-static void replaceEntities(String &s) {
-	s.replace(F("&lt;"), F("<"));
-	s.replace(F("&gt;"), F(">"));
-	s.replace(F("&apos;"), F("'"));
-	s.replace(F("&quot;"), F("\""));
-	// TODO replace unicode entities with UTF-8 bytes
-	s.replace(F("&amp;"), F("&"));
-}
+void replaceEntities(String &s);
 
 template<typename T>
-static bool extractEncodedTags(Stream &stream, const char *terminator,
+bool extractEncodedTags(Stream &stream, const char *terminator,
 		std::function<bool(String tag, T userInfo)> callback, T userInfo) {
 	// skip everything up to (and including) the next &lt;
 	while (stream.findUntil("&lt;", terminator)) {
@@ -63,29 +56,9 @@ static bool extractEncodedTags(Stream &stream, const char *terminator,
 	return true;
 }
 
-static bool extractEncodedTags(Stream &stream, const char *terminator, std::function<bool(String tag)> callback) {
-	return extractEncodedTags<int>(stream, terminator, [&callback](String tag, int) -> bool {
-		return callback(tag);
-	}, 0);
-}
+bool extractEncodedTags(Stream &stream, const char *terminator, std::function<bool(String tag)> callback);
 
-static bool extractAttributeValue(String tag, String attributeName, String *attributeValue) {
-	int attributeStart = tag.indexOf(' ' + attributeName + "=\"");
-	if (attributeStart < 0) {
-		Serial.println(F("Failed to find start of attribute"));
-		return false;
-	}
-	int valueStart = attributeStart + attributeName.length() + 3;
-	int valueEnd = tag.indexOf('"', valueStart);
-	if (valueEnd < 0) {
-		Serial.println(F("Failed to find end of attribute"));
-		return false;
-	}
-	String value = tag.substring(valueStart, valueEnd);
-	replaceEntities(value);
-	*attributeValue = value;
-	return true;
-}
+bool extractAttributeValue(String tag, String attributeName, String *attributeValue);
 
 }
 

@@ -2,6 +2,7 @@
 
 #include <pgmspace.h>
 #include <stddef.h>
+#include <stdio.h>
 
 namespace JSON {
 
@@ -101,8 +102,7 @@ void Builder::_quoted(const String &x) {
 		default:
 			if (*p < ' ') {
 				char buf[7];
-				// the static_cast is just for Eclipse CDT; it doesn't accept std::size_t for the ::size_t parameter
-				snprintf_P(buf, static_cast<size_t>(sizeof(buf)), PSTR("\\u%04X"), *p);
+				snprintf_P(buf, sizeof(buf), PSTR("\\u%04X"), *p);
 				_json += buf;
 			} else {
 				_json += *p;
