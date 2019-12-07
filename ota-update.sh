@@ -9,4 +9,4 @@ then
 	exit 1
 fi
 
-curl -X POST -H "Content-Type: multipart/form-data" -F "f=@${binfile}" http://${host}/api/update
+espota.py -d -i "${host}" -f "${binfile}"

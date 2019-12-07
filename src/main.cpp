@@ -8,6 +8,7 @@
 #include <IPAddress.h>
 #include <pins_arduino.h>
 #include <Ticker.h>
+#include <ArduinoOTA.h>
 
 #include <stddef.h>
 #include <WString.h>
@@ -477,15 +478,23 @@ void setup() {
 	connectWiFi();
 
 	// start web server for configuration
-	configServer.onBeforeUpdate(std::bind(setDisplayUpdating, DUSS_UPDATE_IN_PROGRESS));
-	configServer.onAfterSuccessfulUpdate(std::bind(setDisplayUpdating, DUSS_UPDATE_SUCCESSFUL));
-	configServer.onAfterFailedUpdate(std::bind(setDisplayUpdating, DUSS_UPDATE_FAILED));
 	configServer.onBeforeNetworkConfigChange(destroyEventServer);
 	configServer.onAfterNetworkConfigChange(connectWiFi);
 	configServer.onBeforeSonosConfigChange(destroySubscription);
 	configServer.onAfterSonosConfigChange(initializeSubscription);
 	configServer.onAfterLedConfigChange(configLeds);
 	configServer.begin();
+
+	ArduinoOTA.onStart([]() {
+		setDisplayUpdating(DUSS_UPDATE_IN_PROGRESS);
+	});
+	ArduinoOTA.onEnd([]() {
+		setDisplayUpdating(DUSS_UPDATE_SUCCESSFUL);
+	});
+	ArduinoOTA.onError([](ota_error_t error) {
+		setDisplayUpdating(DUSS_UPDATE_FAILED);
+	});
+	ArduinoOTA.begin();
 }
 
 void loop() {
@@ -514,4 +523,6 @@ void loop() {
 		eventServer->handleEvent();
 	}
 	configServer.handleClient();
+
+	ArduinoOTA.handle();
 }

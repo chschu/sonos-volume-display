@@ -24,11 +24,6 @@ public:
 	void handleClient();
 	void stop();
 
-	// set Update callbacks
-	void onBeforeUpdate(Callback callback);
-	void onAfterSuccessfulUpdate(Callback callback);
-	void onAfterFailedUpdate(Callback callback);
-
 	// set Network configuration change callbacks
 	void onBeforeNetworkConfigChange(Callback callback);
 	void onAfterNetworkConfigChange(Callback callback);
@@ -45,10 +40,6 @@ private:
 	PersistentConfig &_config;
 
 	ESP8266WebServer _server;
-
-	Callback _beforeUpdateCallback;
-	Callback _afterSuccessfulUpdateCallback;
-	Callback _afterFailedUpdateCallback;
 
 	Callback _beforeNetworkConfigChangeCallback;
 	Callback _afterNetworkConfigChangeCallback;
