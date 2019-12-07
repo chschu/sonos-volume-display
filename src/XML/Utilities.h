@@ -9,10 +9,11 @@
 namespace XML {
 
 void replaceEntities(String &s);
+bool extractEncodedTags(Stream &stream, const char *terminator, std::function<bool(String tag)> callback);
+bool extractAttributeValue(String tag, String attributeName, String *attributeValue);
 
 template<typename T>
-bool extractEncodedTags(Stream &stream, const char *terminator,
-		std::function<bool(String tag, T userInfo)> callback, T userInfo) {
+bool extractEncodedTags(Stream &stream, const char *terminator, std::function<bool(String tag, T userInfo)> callback, T userInfo) {
 	// skip everything up to (and including) the next &lt;
 	while (stream.findUntil("&lt;", terminator)) {
 		String tag = "&lt;";
@@ -55,10 +56,6 @@ bool extractEncodedTags(Stream &stream, const char *terminator,
 
 	return true;
 }
-
-bool extractEncodedTags(Stream &stream, const char *terminator, std::function<bool(String tag)> callback);
-
-bool extractAttributeValue(String tag, String attributeName, String *attributeValue);
 
 }
 

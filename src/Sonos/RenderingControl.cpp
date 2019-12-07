@@ -31,8 +31,9 @@ bool RenderingControl::GetVolume(GetVolumeCallback callback, uint32_t instanceID
 	std::unique_ptr<char[]> buf(new char[size]);
 	snprintf_P(buf.get(), size, GET_VOLUME, instanceID, channel);
 
+	WiFiClient wifiClient;
 	HTTPClient client;
-	client.begin(_deviceIP.toString(), 1400, F("/MediaRenderer/RenderingControl/Control"));
+	client.begin(wifiClient, _deviceIP.toString(), 1400, F("/MediaRenderer/RenderingControl/Control"));
 	client.addHeader(F("SOAPACTION"), F("urn:schemas-upnp-org:service:RenderingControl:1#GetVolume"));
 	int status = client.POST(String(buf.get()));
 

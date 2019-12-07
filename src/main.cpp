@@ -234,7 +234,7 @@ void connectWiFi() {
 	WiFi.setAutoConnect(true);
 	WiFi.setAutoReconnect(true);
 
-	if (networkConfig.ssid() != "") {
+	if (strlen(networkConfig.ssid())) {
 		WiFi.enableSTA(true);
 		WiFi.hostname(networkConfig.hostname());
 		WiFi.begin(networkConfig.ssid(), networkConfig.passphrase());
@@ -255,9 +255,15 @@ void initializeSubscription() {
 			Sonos::ZoneGroupTopology topo(addr);
 			bool discoverResult = topo.GetZoneGroupState_Decoded([&sonosConfig](Sonos::ZoneInfo info) {
 				if (info.uuid == sonosConfig.roomUuid()) {
+					Serial.print(F("Found a player IP address with the configured zone: "));
+					Serial.println(info.playerIP);
 					subscribeToVolumeChange(info);
 				}
 			});
+
+			if (!discoverResult) {
+				Serial.print(F("Failed to find the configured zone"));
+			}
 		}
 	}
 }
@@ -292,8 +298,6 @@ void destroyEventServer() {
 }
 
 void configLeds() {
-	const Config::LedConfig &ledConfig = config.led();
-
 	// show volume to visualize the brightness change
 	if (displayState == DS_ACTIVE && displayActiveSubState == DASS_HIDING) {
 		setDisplayActive(DASS_SHOWING_VOLUME);
@@ -450,8 +454,6 @@ void setup() {
 	Color::RGB red = { 255, 0, 0 };
 	Color::RGB green = { 0, 255, 0 };
 	Color::RGB yellow = { 255, 255, 0 };
-	Color::RGB magenta = { 255, 0, 255 };
-	Color::RGB white = { 255, 255, 255 };
 
 	// initialize color gradient for volume
 	gradient.set(0 * LED_COUNT / 4, green);

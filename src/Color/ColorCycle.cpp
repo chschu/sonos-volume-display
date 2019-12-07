@@ -13,9 +13,9 @@ RGB ColorCycle::get(uint16_t pos) const {
 	uint16_t i = pos % _length;
 	float phi = 2.0 * PI / _length;
 	return {
-		127.5 * (1.0 + sinf((i + _rOffset) * phi)),
-		127.5 * (1.0 + sinf((i + _gOffset) * phi)),
-		127.5 * (1.0 + sinf((i + _bOffset) * phi))
+		static_cast<uint8_t>(127.5 * (1.0 + sinf((i + _rOffset) * phi))),
+		static_cast<uint8_t>(127.5 * (1.0 + sinf((i + _gOffset) * phi))),
+		static_cast<uint8_t>(127.5 * (1.0 + sinf((i + _bOffset) * phi)))
 	};
 }
 

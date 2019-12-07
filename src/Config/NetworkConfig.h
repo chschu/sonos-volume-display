@@ -5,7 +5,7 @@ namespace Config {
 
 class NetworkConfig {
 public:
-	typedef struct Data {
+	struct Data {
 		char ssid[32];
 		char passphrase[64];
 		char hostname[33];

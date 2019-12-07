@@ -25,8 +25,10 @@ ZoneGroupTopology::ZoneGroupTopology(IPAddress deviceIP) :
 bool ZoneGroupTopology::GetZoneGroupState_Decoded(ZoneInfoCallback callback, bool visibleOnly) {
 	bool result = false;
 
+	WiFiClient wifiClient;
 	HTTPClient client;
-	if (client.begin(_deviceIP.toString(), 1400, F("/ZoneGroupTopology/Control"))) {
+
+	if (client.begin(wifiClient, _deviceIP.toString(), 1400, F("/ZoneGroupTopology/Control"))) {
 		client.addHeader(F("SOAPACTION"), F("urn:schemas-upnp-org:service:ZoneGroupTopology:1#GetZoneGroupState"));
 		int status = client.POST(FPSTR(GET_ZONE_GROUP_STATE));
 

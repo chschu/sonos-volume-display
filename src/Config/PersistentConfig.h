@@ -11,7 +11,7 @@ namespace Config {
 
 class PersistentConfig {
 public:
-	typedef struct Data {
+	struct Data {
 		uint32_t magic;
 		NetworkConfig::Data network;
 		SonosConfig::Data sonos;

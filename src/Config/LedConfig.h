@@ -9,14 +9,14 @@ namespace Config {
 
 class LedConfig {
 public:
-	typedef enum Transform {
+	enum Transform {
 		IDENTITY, // x -> x
 		SQUARE, // x -> x^2
 		SQUARE_ROOT, // x -> x^(1/2)
 		INVERSE_SQUARE, // x -> 1-(1-x)^2
 	};
 
-	typedef struct Data {
+	struct Data {
 		uint8_t brightness;
 		Transform transform;
 	};

@@ -5,7 +5,7 @@ namespace Config {
 
 class SonosConfig {
 public:
-	typedef struct Data {
+	struct Data {
 		bool active;
 		char roomUuid[32];
 	};

@@ -30,8 +30,9 @@ static unsigned int extractTimeoutSeconds(String timeoutResponseHeaderValue, uns
 bool EventServer::subscribe(EventCallback callback, String subscriptionURL, String *SID, unsigned int timeoutSeconds,
 		double renewalThreshold) {
 	bool result = false;
+	WiFiClient wifiClient;
 	HTTPClient http;
-	if (http.begin(subscriptionURL)) {
+	if (http.begin(wifiClient, subscriptionURL)) {
 		http.addHeader(F("NT"), F("upnp:event"));
 		http.addHeader(F("CALLBACK"),
 				String(F("<http://")) + WiFi.localIP().toString() + ':' + String(_callbackPort) + '>');
@@ -86,8 +87,9 @@ bool EventServer::_renew(std::map<String, _Subscription>::iterator subIt) {
 	_Subscription &sub = subIt->second;
 	Serial.print(F("renewing subscription for SID "));
 	Serial.println(SID);
+	WiFiClient wifiClient;
 	HTTPClient http;
-	if (http.begin(sub._subscriptionURL)) {
+	if (http.begin(wifiClient, sub._subscriptionURL)) {
 		http.addHeader(F("SID"), SID);
 		http.addHeader(F("TIMEOUT"), String(F("Second-")) + String(sub._timeoutSeconds));
 		const char *headerKeys[] = { "TIMEOUT" };
@@ -111,8 +113,9 @@ bool EventServer::unsubscribe(String SID) {
 	bool result = false;
 	auto sub = _subscriptionForSID.find(SID);
 	if (sub != _subscriptionForSID.end()) {
+		WiFiClient wifiClient;
 		HTTPClient http;
-		if (http.begin(sub->second._subscriptionURL)) {
+		if (http.begin(wifiClient, sub->second._subscriptionURL)) {
 			http.addHeader(F("SID"), SID);
 			int status = http.sendRequest("UNSUBSCRIBE");
 			Serial.println(F("EventServer::unsubscribe() -> status "));
