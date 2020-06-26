@@ -41,6 +41,7 @@ const float LED_GAMMA = 2.2;
 Config::PersistentConfig config;
 Config::Server configServer(config);
 UPnP::EventServer *eventServer = NULL;
+bool subscribed = false;
 Color::Gradient gradient;
 
 NeoGamma<NeoGammaTableMethod> colorGamma;
@@ -221,8 +222,10 @@ void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
 		Serial.print(F("Subscribed with new SID "));
 		Serial.println(newSID);
 		setDisplayActive(DASS_HIDING);
+		subscribed = true;
 	} else {
 		Serial.println(F("Subscription failed"));
+		subscribed = false;
 	}
 }
 
@@ -273,6 +276,7 @@ void destroySubscription() {
 
 	if (eventServer) {
 		eventServer->unsubscribeAll();
+		subscribed = false;
 	}
 }
 
@@ -284,6 +288,7 @@ void initializeEventServer() {
 	Serial.println(WiFi.macAddress());
 	eventServer = new UPnP::EventServer(WiFi.localIP());
 	eventServer->begin();
+	subscribed = false;
 }
 
 void destroyEventServer() {
@@ -294,6 +299,7 @@ void destroyEventServer() {
 		eventServer->stop();
 		delete eventServer;
 		eventServer = NULL;
+		subscribed = false;
 	}
 }
 
@@ -502,9 +508,12 @@ void setup() {
 void loop() {
 	// initialize event server if WiFi is (re-)connected
 	bool connected = WiFi.isConnected();
-	if (connected && !eventServer) {
-		initializeEventServer();
-		initializeSubscription();
+	if (connected) {
+		if (!eventServer) {
+			initializeEventServer();
+		} else if (!subscribed) {
+			initializeSubscription();
+		}
 	}
 	// destroy event server if WiFi disconnected unexpectedly
 	if (!connected && eventServer) {
