@@ -40,7 +40,7 @@ const float LED_GAMMA = 2.2;
 
 Config::PersistentConfig config;
 Config::Server configServer(config);
-UPnP::EventServer *eventServer = NULL;
+std::unique_ptr<UPnP::EventServer> eventServer;
 bool subscribed = false;
 Color::Gradient gradient;
 
@@ -286,7 +286,7 @@ void initializeEventServer() {
 	Serial.println(WiFi.localIP());
 	Serial.println(WiFi.SSID());
 	Serial.println(WiFi.macAddress());
-	eventServer = new UPnP::EventServer(WiFi.localIP());
+	eventServer.reset(new UPnP::EventServer(WiFi.localIP()));
 	eventServer->begin();
 	subscribed = false;
 }
@@ -297,8 +297,7 @@ void destroyEventServer() {
 	if (eventServer) {
 		Serial.println("destroying EventServer on WiFi disconnect");
 		eventServer->stop();
-		delete eventServer;
-		eventServer = NULL;
+		eventServer.reset();
 		subscribed = false;
 	}
 }
