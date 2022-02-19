@@ -16,7 +16,7 @@ typedef std::function<void(String SID, Stream &stream)> EventCallback;
 
 class EventServer: public WiFiServer {
 public:
-	EventServer(IPAddress addr, uint16_t callbackPort = 1400);
+	EventServer(const IPAddress &addr, uint16_t callbackPort = 1400);
 	EventServer(uint16_t callbackPort = 1400);
 
 	// subscribe to an event at the endpoint defined via subscriptionURL
@@ -25,14 +25,14 @@ public:
 	// a successful subscription response contains a timeout value; renewalThreshold defines the fraction of that
 	// timeout after which an automatic renewal is performed in handleEvents()
 	// if subscription was successful, this function returns true and stores the SID in *SID
-	bool subscribe(EventCallback callback, String subscriptionURL, String *SID = NULL, unsigned int timeoutSeconds =
+	bool subscribe(const EventCallback &callback, const String &subscriptionURL, String *SID = nullptr, unsigned int timeoutSeconds =
 			3600, double renewalThreshold = 0.9);
 
 	// renew the subscription for the given SID
-	bool renew(String SID);
+	bool renew(const String &SID);
 
 	// unsubscribe from an event specified by its SID
-	bool unsubscribe(String SID);
+	bool unsubscribe(const String &SID);
 
 	// unsubscribe from all known events
 	void unsubscribeAll();
@@ -56,7 +56,8 @@ private:
 		double _renewalThreshold;
 	};
 
-	bool _renew(std::map<String, _Subscription>::iterator subIt);
+	bool _renew(const String &SID, _Subscription &sub);
+	bool _unsubscribe(const String &SID, _Subscription &sub);
 
 	uint16_t _callbackPort;
 	std::map<String, _Subscription> _subscriptionForSID;

@@ -11,7 +11,7 @@
 
 namespace UPnP {
 
-EventServer::EventServer(IPAddress addr, uint16_t callbackPort) :
+EventServer::EventServer(const IPAddress &addr, uint16_t callbackPort) :
 		WiFiServer(addr, callbackPort), _callbackPort(callbackPort) {
 }
 
@@ -27,7 +27,7 @@ static unsigned int extractTimeoutSeconds(String timeoutResponseHeaderValue, uns
 	return defaultValue;
 }
 
-bool EventServer::subscribe(EventCallback callback, String subscriptionURL, String *SID, unsigned int timeoutSeconds,
+bool EventServer::subscribe(const EventCallback &callback, const String &subscriptionURL, String *SID, unsigned int timeoutSeconds,
 		double renewalThreshold) {
 	bool result = false;
 	WiFiClient wifiClient;
@@ -72,19 +72,8 @@ bool EventServer::subscribe(EventCallback callback, String subscriptionURL, Stri
 	return result;
 }
 
-bool EventServer::renew(String SID) {
-	auto subIt = _subscriptionForSID.find(SID);
-	if (subIt == _subscriptionForSID.end()) {
-		Serial.println(F("unable to renew an unknown subscription"));
-		return false;
-	}
-	return _renew(subIt);
-}
-
-bool EventServer::_renew(std::map<String, _Subscription>::iterator subIt) {
+bool EventServer::_renew(const String &SID, _Subscription &sub) {
 	bool result = false;
-	String SID = subIt->first;
-	_Subscription &sub = subIt->second;
 	Serial.print(F("renewing subscription for SID "));
 	Serial.println(SID);
 	WiFiClient wifiClient;
@@ -109,34 +98,51 @@ bool EventServer::_renew(std::map<String, _Subscription>::iterator subIt) {
 	return result;
 }
 
-bool EventServer::unsubscribe(String SID) {
+bool EventServer::renew(const String &SID) {
+	auto subIt = _subscriptionForSID.find(SID);
+	if (subIt == _subscriptionForSID.end()) {
+		Serial.println(F("unable to renew an unknown subscription"));
+		return false;
+	}
+	return _renew(subIt->first, subIt->second);
+}
+
+bool EventServer::_unsubscribe(const String &SID, _Subscription &sub) {
 	bool result = false;
-	auto sub = _subscriptionForSID.find(SID);
-	if (sub != _subscriptionForSID.end()) {
-		WiFiClient wifiClient;
-		HTTPClient http;
-		if (http.begin(wifiClient, sub->second._subscriptionURL)) {
-			http.addHeader(F("SID"), SID);
-			int status = http.sendRequest("UNSUBSCRIBE");
-			Serial.println(F("EventServer::unsubscribe() -> status "));
-			Serial.println(status);
-			if (status == 200) {
-				_subscriptionForSID.erase(sub);
-				result = true;
-			}
-			http.end();
-		}
+    WiFiClient wifiClient;
+    HTTPClient http;
+    if (http.begin(wifiClient, sub._subscriptionURL)) {
+        http.addHeader(F("SID"), SID);
+        int status = http.sendRequest("UNSUBSCRIBE");
+        Serial.println(F("EventServer::unsubscribe() -> status "));
+        Serial.println(status);
+        if (status == 200) {
+            result = true;
+        }
+        http.end();
+    }
+	return result;
+}
+
+bool EventServer::unsubscribe(const String &SID) {
+	bool result = false;
+	auto subIt = _subscriptionForSID.find(SID);
+	if (subIt != _subscriptionForSID.end()) {
+        if (_unsubscribe(subIt->first, subIt->second)) {
+            _subscriptionForSID.erase(subIt);
+            result = true;
+        }
 	}
 	return result;
 }
 
+
 void EventServer::unsubscribeAll() {
-	while (!_subscriptionForSID.empty()) {
-		if (!unsubscribe(_subscriptionForSID.begin()->first)) {
-			// unsubscribe failed, remove it nevertheless
-			_subscriptionForSID.erase(_subscriptionForSID.begin());
-		}
-	}
+    auto subIt = _subscriptionForSID.begin();
+    while (subIt != _subscriptionForSID.end()) {
+        _unsubscribe(subIt->first, subIt->second);
+        subIt = _subscriptionForSID.erase(subIt);
+    }
 }
 
 const char NOTIFY_RESPONSE[] PROGMEM = "HTTP/1.1 %u %s\r\n\r\n";
@@ -253,15 +259,16 @@ void EventServer::handleEvent() {
 	}
 
 	// renew all subscriptions whose _renewalAfterMillis has elapsed
-	for (auto it = _subscriptionForSID.begin(); it != _subscriptionForSID.end();) {
-		_Subscription &sub = it->second;
+	for (auto subIt = _subscriptionForSID.begin(); subIt != _subscriptionForSID.end();) {
+        const String &SID = subIt->first;
+		_Subscription &sub = subIt->second;
 		// if renewal is required and it fails, remove the subscription
-		if (millis() - sub._startMillis >= sub._renewalAfterMillis && !_renew(it)) {
+		if (millis() - sub._startMillis >= sub._renewalAfterMillis && !_renew(SID, sub)) {
 			Serial.print(F("removing subscription after failed renewal for SID "));
-			Serial.println(it->first);
-			it = _subscriptionForSID.erase(it);
+			Serial.println(SID);
+			subIt = _subscriptionForSID.erase(subIt);
 		} else {
-			++it;
+			++subIt;
 		}
 	}
 }
