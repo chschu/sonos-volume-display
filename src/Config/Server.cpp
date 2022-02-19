@@ -95,6 +95,7 @@ void Server::_handleGetApiInfo() {
 	json.attribute(F("sketch-size"), ESP.getSketchSize());
 	json.endObject();
 	_server.send(200, F("application/json; charset=utf-8"), json.toString());
+    _server.client().stop();
 }
 
 void Server::_handleGetApiDiscoverNetworks() {
@@ -117,6 +118,7 @@ void Server::_handleGetApiDiscoverNetworks() {
 	} else {
 		_server.send(500, F("text/plain"), F("Network Scan Failed"));
 	}
+    _server.client().stop();
 
 	WiFi.scanDelete();
 }
@@ -145,6 +147,7 @@ void Server::_handleGetApiDiscoverRooms() {
 	} else {
 		_server.send(404, F("text/plain"), F("No Devices Found"));
 	}
+    _server.client().stop();
 }
 
 void Server::_handleGetApiConfigNetwork() {
@@ -256,6 +259,7 @@ void Server::_sendResponseNetwork(int code) {
 	json.endObject();
 
 	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+    _server.client().stop();
 }
 
 void Server::_sendResponseSonos(int code) {
@@ -268,6 +272,7 @@ void Server::_sendResponseSonos(int code) {
 	json.endObject();
 
 	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+    _server.client().stop();
 }
 
 void Server::_sendResponseLed(int code) {
@@ -306,6 +311,7 @@ void Server::_sendResponseLed(int code) {
 	json.endObject();
 
 	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+    _server.client().stop();
 }
 
 template<typename C, typename T>
