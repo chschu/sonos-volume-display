@@ -36,7 +36,6 @@ const String AP_SSID = String("svd-") + String(ESP.getChipId(), 16);
 
 const uint16_t LED_COUNT = 24;
 const uint8_t LED_PIN = D1;
-const float LED_GAMMA = 2.2;
 
 Config::PersistentConfig config;
 Config::Server configServer(config);
@@ -48,14 +47,7 @@ NeoGamma<NeoGammaTableMethod> colorGamma;
 NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod> strip(LED_COUNT, LED_PIN);
 
 WiFiEventHandler sta_got_ip;
-volatile bool sta_got_ip_called = false;
-
 WiFiEventHandler sta_disconnected;
-volatile bool sta_disconnected_called = false;
-
-WiFiEventHandler ap_sta_connected;
-WiFiEventHandler ap_sta_disconnected;
-volatile int ap_sta_connections = 0;
 
 // color for mute
 const RgbColor MUTE_COLOR(0, 0, 63);
@@ -64,37 +56,10 @@ const RgbColor MUTE_COLOR(0, 0, 63);
 const uint16_t COLOR_CYCLE_LENGTH = 57;
 const Color::ColorCycle COLOR_CYCLE(COLOR_CYCLE_LENGTH, 0, COLOR_CYCLE_LENGTH / 3, 2 * COLOR_CYCLE_LENGTH / 3);
 
-// top-level states
-typedef enum {
-    DS_INACTIVE, DS_ACTIVE, DS_UPDATING,
-} DisplayState;
-
-// sub-states for DS_ACTIVE
-typedef enum {
-    DASS_HIDING, DASS_SHOWING_VOLUME, DASS_SHOWING_MUTE,
-} DisplayActiveSubState;
-
-// sub-states for DS_UPDATING
-typedef enum {
-    DUSS_UPDATE_IN_PROGRESS, DUSS_UPDATE_SUCCESSFUL, DUSS_UPDATE_FAILED,
-} DisplayUpdatingSubState;
-
-DisplayState displayState = DS_INACTIVE;
-DisplayActiveSubState displayActiveSubState;
-DisplayUpdatingSubState displayUpdatingSubState;
-
-Ticker displayUpdateTicker;
-
-unsigned long lastStateChangeMillis = 0;
-
 struct VolumeState {
-    int8_t master, lf, rf, mute;
+    int8_t master = -1, lf = -1, rf = -1, mute = -1;
 
-    void reset() {
-        master = lf = rf = mute = -1;
-    }
-
-    bool complete() {
+    bool isComplete() const {
         return master != -1 && lf != -1 && rf != -1 && mute != -1;
     }
 
@@ -103,24 +68,141 @@ struct VolumeState {
     }
 };
 
-VolumeState current;
+class Display {
+public:
+    void notifyNotReady() {
+        if (_state != _DS_COLOR_CYCLE) {
+            // reset color cycle
+            for (int i = 0; i < LED_COUNT; i++) {
+                _leds[i] = RgbColor(0, 0, 0);
+            }
+            _colorCycleLedOffset = -1;
+            _colorCycleOffset = -1;
 
-void setDisplayInactive() {
-    displayState = DS_INACTIVE;
-    lastStateChangeMillis = millis();
-}
+            _state = _DS_COLOR_CYCLE;
+        }
+    }
 
-void setDisplayActive(DisplayActiveSubState subState) {
-    displayState = DS_ACTIVE;
-    displayActiveSubState = subState;
-    lastStateChangeMillis = millis();
-}
+    void notifyReady() {
+        if (_state == _DS_COLOR_CYCLE) {
+            // reset volume state
+            _volumeState = VolumeState();
 
-void setDisplayUpdating(DisplayUpdatingSubState subState) {
-    displayState = DS_UPDATING;
-    displayUpdatingSubState = subState;
-    lastStateChangeMillis = millis();
-}
+            _state = _DS_NOTHING;
+        }
+    }
+
+    void notifyNotConnected() {
+        _state = _DS_NOT_CONNECTED;
+    }
+
+    void notifyVolumeState(const VolumeState &volumeState)  {
+        // check for changes
+        if (volumeState.isComplete() && volumeState != _volumeState) {
+            // copy changes to current state
+            _volumeState = volumeState;
+
+            Serial.printf_P(PSTR("master=%u, lf=%u, rf=%u, mute=%u\n"), _volumeState.master, _volumeState.lf, _volumeState.rf, _volumeState.mute);
+            _state = _DS_VOLUME_STATE;
+            if (!_volumeState.mute) {
+                _volumeShownAtMillis = millis();
+            }
+        }
+    }
+
+    void updateDisplay(std::function<float(float)> transform) {
+        if (_state == _DS_VOLUME_STATE && !_volumeState.mute && millis() > _volumeShownAtMillis + 2000) {
+            _state = _DS_NOTHING;
+        }
+
+        if (_state == _DS_COLOR_CYCLE) {
+            // update LEDs
+            for (int i = 0; i < LED_COUNT; i++) {
+                _leds[i] = RgbColor::LinearBlend(_leds[i], 0, 20.0/255.0);
+            }
+            _leds[_colorCycleLedOffset] = _toRgbColor(COLOR_CYCLE.get(_colorCycleOffset));
+
+            // update offsets
+            if (++_colorCycleLedOffset == LED_COUNT) {
+                _colorCycleLedOffset = 0;
+            }
+            if (++_colorCycleOffset == COLOR_CYCLE_LENGTH) {
+                _colorCycleOffset = 0;
+            }
+        } else if (_state == _DS_VOLUME_STATE) {
+            for (int i = 0; i < LED_COUNT; i++) {
+                _leds[i] = RgbColor(0, 0, 0);
+            }
+
+            float leftLed = LED_COUNT / 2 * transform(_volumeState.master * _volumeState.lf / 10000.0);
+            uint16_t leftLedInt = floor(leftLed);
+            float leftLedFrac = leftLed - leftLedInt;
+            for (uint16_t i = 0; i < leftLedInt; i++) {
+                _leds[i] = _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(i));
+            }
+            if (leftLedInt < LED_COUNT / 2) {
+                _leds[leftLedInt] = RgbColor::LinearBlend(
+                        0,
+                        _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(leftLedInt)),
+                                leftLedFrac);
+            }
+
+            float rightLed = LED_COUNT / 2 * transform(_volumeState.master * _volumeState.rf / 10000.0);
+            uint16_t rightLedInt = floor(rightLed);
+            float rightLedFrac = rightLed - rightLedInt;
+            for (uint16_t i = 0; i < rightLedInt; i++) {
+                _leds[LED_COUNT - 1 - i] = _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(LED_COUNT - 1 - i));
+            }
+            if (rightLedInt < LED_COUNT / 2) {
+                _leds[LED_COUNT - 1 - rightLedInt] = RgbColor::LinearBlend(
+                        0,
+                        _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(LED_COUNT - 1 - rightLedInt)),
+                                rightLedFrac);
+            }
+        } else if (_state == _DS_NOTHING) {
+            for (int i = 0; i < LED_COUNT; i++) {
+                _leds[i] = RgbColor(0, 0, 0);
+            }
+        } else if (_state == _DS_NOT_CONNECTED) {
+            for (int i = 0; i < LED_COUNT; i++) {
+                _leds[i] = RgbColor(63, 0, 0);
+            }
+        }
+
+        const Config::LedConfig &ledConfig = config.led();
+        for (int i = 0; i < LED_COUNT; i++) {
+            strip.SetPixelColor(i, colorGamma.Correct(RgbColor::LinearBlend(0, _leds[i], ledConfig.brightness() / 255.0)));
+        }
+
+        strip.Show();
+    }
+
+private:
+    enum _DisplayState {
+        _DS_COLOR_CYCLE,
+        _DS_NOTHING,
+        _DS_VOLUME_STATE,
+        _DS_NOT_CONNECTED,
+    };
+    _DisplayState _state = _DS_COLOR_CYCLE;
+
+    VolumeState _volumeState;
+
+    unsigned long _volumeShownAtMillis;
+
+    int16_t _colorCycleLedOffset = 0;
+    int16_t _colorCycleOffset = 0;
+
+    inline RgbColor _toRgbColor(const Color::RGB &color) {
+        return RgbColor(color.red, color.green, color.blue);
+    }
+
+    RgbColor _leds[LED_COUNT];
+};
+
+Display display;
+
+Ticker displayUpdateTicker;
 
 bool renderingControlEventXmlTagCallback(String tag, VolumeState &volumeState) {
     if (tag.startsWith("<Volume ")) {
@@ -189,111 +271,97 @@ bool renderingControlEventXmlTagCallback(String tag, VolumeState &volumeState) {
 }
 
 void renderingControlEventCallback(String SID, Stream &stream) {
-    // ignore events if not active
-    if (displayState != DS_ACTIVE) {
-        return;
-    }
+    static VolumeState volumeState;
 
-    // copy current state
-    VolumeState next = current;
+    // update volume state
+    XML::extractEncodedTags<VolumeState &>(stream, "</LastChange>", &renderingControlEventXmlTagCallback, volumeState);
 
-    // update current state
-    XML::extractEncodedTags<VolumeState &>(stream, "</LastChange>", &renderingControlEventXmlTagCallback, next);
-
-    // check for changes
-    if (next != current) {
-        // copy changes to current state
-        current = next;
-
-        // show if all attributes are valid
-        if (current.complete()) {
-            Serial.printf("master=%u, lf=%u, rf=%u, mute=%u\r\n", current.master, current.lf, current.rf, current.mute);
-            setDisplayActive(current.mute ? DASS_SHOWING_MUTE : DASS_SHOWING_VOLUME);
-        }
-    }
+    // update display
+    display.notifyVolumeState(volumeState);
 }
 
-void subscribeToVolumeChange(Sonos::ZoneInfo &info) {
-    Serial.print(F("Discovered: "));
-    Serial.print(info.name);
-    Serial.print(F(" @ "));
-    Serial.println(info.playerIP);
-
-    String newSID;
-
-    // reset current state
-    current.reset();
-
-    bool result = eventServer->subscribe(renderingControlEventCallback,
-            "http://" + info.playerIP.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
-
-    if (result) {
-        Serial.print(F("Subscribed with new SID "));
-        Serial.println(newSID);
-        setDisplayActive(DASS_HIDING);
-    } else {
-        Serial.println(F("Subscription failed"));
-    }
-}
-
-void configureWiFi() {
+bool startWiFiStation() {
     const Config::NetworkConfig &networkConfig = config.network();
-
-    WiFi.mode(WIFI_AP_STA);
-    WiFi.softAP(AP_SSID.c_str(), "q1w2e3r4");
-
     if (networkConfig.ssid()) {
+        WiFi.mode(WIFI_STA);
         WiFi.hostname(networkConfig.hostname());
-        WiFi.setAutoConnect(true);
-        WiFi.setAutoReconnect(true);
+        WiFi.setAutoConnect(false);
+        WiFi.setAutoReconnect(false);
         WiFi.begin(networkConfig.ssid(), networkConfig.passphrase());
+        return true;
     }
+    return false;
 }
 
-void initializeEventServer() {
-    Serial.println("initializing EventServer");
+void startWiFiAccessPoint() {
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(AP_SSID.c_str(), F("q1w2e3r4"));
+}
 
+void startEventServer() {
     Serial.println(WiFi.localIP());
     Serial.println(WiFi.SSID());
     Serial.println(WiFi.macAddress());
     eventServer.reset(new UPnP::EventServer(WiFi.localIP()));
     eventServer->begin();
+}
 
+IPAddress anySonosDeviceIp;
+
+bool findSonosDeviceIp() {
+    const Config::SonosConfig &sonosConfig = config.sonos();
+    if (sonosConfig.active() && Sonos::Discover::any(&anySonosDeviceIp)) {
+        Serial.print(F("Found a device: "));
+        Serial.println(anySonosDeviceIp);
+        return true;
+    }
+    return false;
+}
+
+IPAddress roomSonosDeviceIp;
+
+bool findRoomSonosDeviceIp() {
     const Config::SonosConfig &sonosConfig = config.sonos();
     if (sonosConfig.active()) {
-        IPAddress addr;
-        if (Sonos::Discover::any(&addr)) {
-            Serial.print(F("Found a device: "));
-            Serial.println(addr);
-
-            Sonos::ZoneGroupTopology topo(addr);
-            bool discoverResult = topo.GetZoneGroupState_Decoded([&sonosConfig](Sonos::ZoneInfo info) {
-                if (info.uuid == sonosConfig.roomUuid()) {
-                    Serial.print(F("Found a player IP address with the configured zone: "));
-                    Serial.println(info.playerIP);
-                    subscribeToVolumeChange(info);
-                }
-            });
-
-            if (!discoverResult) {
-                Serial.println(F("Failed to find the configured zone"));
+        Sonos::ZoneGroupTopology topo(anySonosDeviceIp);
+        bool found = false;
+        topo.GetZoneGroupState_Decoded([sonosConfig, &found](Sonos::ZoneInfo info) {
+            if (info.uuid == sonosConfig.roomUuid()) {
+                Serial.print(F("Found a player with the configured room: "));
+                Serial.print(info.name);
+                Serial.print(F(" @ "));
+                Serial.println(info.playerIP);
+                roomSonosDeviceIp = info.playerIP;
+                found = true;
             }
+        });
+
+        if (found) {
+            return true;
         }
+        Serial.println(F("Failed to find the configured room"));
     }
+    return false;
+}
+
+bool subscribeToVolumeChange() {
+    String newSID;
+
+    bool result = eventServer->subscribe(renderingControlEventCallback,
+            "http://" + roomSonosDeviceIp.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
+
+    if (result) {
+        Serial.print(F("Subscribed with new SID "));
+        Serial.println(newSID);
+    } else {
+        Serial.println(F("Subscription failed"));
+    }
+
+    return result;
 }
 
 void destroyEventServer() {
-    Serial.println("destroying EventServer");
-
-    setDisplayInactive();
     eventServer.reset();
-}
-
-void configLeds() {
-    // show volume to visualize the brightness change
-    if (displayState == DS_ACTIVE && displayActiveSubState == DASS_HIDING) {
-        setDisplayActive(DASS_SHOWING_VOLUME);
-    }
 }
 
 // transform volume value in [0,1] to display value [0,1]
@@ -308,137 +376,26 @@ float transform(float volume) {
     case Config::LedConfig::Transform::INVERSE_SQUARE:
         return volume * (2.0 - volume);
     default:
-        Serial.println(F("unknown transformation, using IDENTITY"));
+        Serial.println(F("Unknown transformation, using IDENTITY"));
         return volume;
     }
 }
 
+typedef enum {
+    AS_INIT,
+    AS_WIFI_NOT_CONNECTED,
+    AS_WIFI_CONNECTING,
+    AS_WIFI_CONNECTING_STOPPED,
+    AS_WIFI_GOT_IP,
+    AS_WIFI_DISCONNECTED,
+    AS_EVENT_SERVER_STARTED,
+    AS_ANY_SPEAKER_FOUND,
+    AS_ROOM_SPEAKER_FOUND,
+    AS_EVENT_SUBSCRIBED,
+    AS_READY,
+} ApplicationState;
 
-inline RgbColor toRgbColor(const Color::RGB &color) {
-    return RgbColor(color.red, color.green, color.blue);
-}
-
-void updateDisplay() {
-    static int16_t colorCycleOffset = -1;
-    static int16_t colorCycleLedOffset = -1;
-    static int16_t updateCycleLedOffset = -1;
-
-    static RgbColor leds[LED_COUNT];
-
-    if (((displayState == DS_ACTIVE && displayActiveSubState == DASS_SHOWING_VOLUME)
-            || (displayState == DS_UPDATING && displayUpdatingSubState == DUSS_UPDATE_FAILED))
-            && millis() - lastStateChangeMillis > 2000) {
-        setDisplayActive(DASS_HIDING);
-    }
-
-    if (displayState != DS_INACTIVE) {
-        colorCycleLedOffset = -1;
-    }
-
-    if (displayState != DS_UPDATING) {
-        updateCycleLedOffset = -1;
-    }
-
-    if (displayState == DS_INACTIVE) {
-        if (colorCycleLedOffset < 0) {
-            // initialize color cycle
-            memset(leds, 0, sizeof(leds));
-            colorCycleLedOffset = 0;
-            colorCycleOffset = 0;
-        }
-
-        // update LEDs
-        for (int i = 0; i < LED_COUNT; i++) {
-            leds[i] = RgbColor::LinearBlend(leds[i], 0, 20.0/255.0);
-        }
-        leds[colorCycleLedOffset] = toRgbColor(COLOR_CYCLE.get(colorCycleOffset));
-
-        // update offsets
-        if (++colorCycleLedOffset == LED_COUNT) {
-            colorCycleLedOffset = 0;
-        }
-        if (++colorCycleOffset == COLOR_CYCLE_LENGTH) {
-            colorCycleOffset = 0;
-        }
-    } else if (displayState == DS_ACTIVE) {
-        if (displayActiveSubState == DASS_SHOWING_VOLUME || displayActiveSubState == DASS_SHOWING_MUTE) {
-            memset(leds, 0, sizeof(leds));
-
-            float leftLed = LED_COUNT / 2 * transform(current.master * current.lf / 10000.0);
-            uint16_t leftLedInt = floor(leftLed);
-            float leftLedFrac = leftLed - leftLedInt;
-            for (uint16_t i = 0; i < leftLedInt; i++) {
-                leds[i] = current.mute ? MUTE_COLOR : toRgbColor(gradient.get(i));
-            }
-            if (leftLedInt < LED_COUNT / 2) {
-                leds[leftLedInt] = RgbColor::LinearBlend(
-                        0,
-                        current.mute ? MUTE_COLOR : toRgbColor(gradient.get(leftLedInt)),
-                                leftLedFrac);
-            }
-
-            float rightLed = LED_COUNT / 2 * transform(current.master * current.rf / 10000.0);
-            uint16_t rightLedInt = floor(rightLed);
-            float rightLedFrac = rightLed - rightLedInt;
-            for (uint16_t i = 0; i < rightLedInt; i++) {
-                leds[LED_COUNT - 1 - i] = current.mute ? MUTE_COLOR : toRgbColor(gradient.get(LED_COUNT - 1 - i));
-            }
-            if (rightLedInt < LED_COUNT / 2) {
-                leds[LED_COUNT - 1 - rightLedInt] = RgbColor::LinearBlend(
-                        0,
-                        current.mute ? MUTE_COLOR : toRgbColor(gradient.get(LED_COUNT - 1 - rightLedInt)),
-                                rightLedFrac);
-            }
-        } else if (displayActiveSubState == DASS_HIDING) {
-            memset(leds, 0, sizeof(leds));
-        } else {
-            Serial.print(F("unknown display active sub-state: "));
-            Serial.println(displayActiveSubState);
-        }
-    } else if (displayState == DS_UPDATING) {
-        if (displayUpdatingSubState == DUSS_UPDATE_IN_PROGRESS) {
-            if (updateCycleLedOffset < 0) {
-                // initialize update cycle
-                memset(leds, 0, sizeof(leds));
-                updateCycleLedOffset = 0;
-            }
-
-            // update LEDs
-            for (int i = 0; i < LED_COUNT; i++) {
-                leds[i] = RgbColor::LinearBlend(leds[i], 0, 40.0/255.0);
-            }
-            leds[updateCycleLedOffset] = RgbColor(255, 255, 0);
-            leds[(updateCycleLedOffset + LED_COUNT / 2) % LED_COUNT] = RgbColor(255, 0, 255);
-
-            /* update offsets */
-            if (++updateCycleLedOffset == LED_COUNT) {
-                updateCycleLedOffset = 0;
-            }
-        } else if (displayUpdatingSubState == DUSS_UPDATE_SUCCESSFUL) {
-            for (uint16_t i = 0; i < LED_COUNT; i++) {
-                leds[i] = RgbColor(0, 255, 0);
-            }
-        } else if (displayUpdatingSubState == DUSS_UPDATE_FAILED) {
-            for (uint16_t i = 0; i < LED_COUNT; i++) {
-                leds[i] = RgbColor(255, 0, 0);
-            }
-        } else {
-            Serial.print(F("unknown display updating sub-state: "));
-            Serial.println(displayUpdatingSubState);
-        }
-    } else {
-        Serial.print(F("unknown display state: "));
-        Serial.println(displayState);
-    }
-
-    const Config::LedConfig &ledConfig = config.led();
-    for (int i = 0; i < LED_COUNT; i++) {
-        strip.SetPixelColor(i, colorGamma.Correct(RgbColor::LinearBlend(0, leds[i], ledConfig.brightness() / 255.0)));
-    }
-
-    strip.Show();
-}
-
+ApplicationState applicationState;
 
 void setup() {
     Serial.begin(115200);
@@ -463,28 +420,20 @@ void setup() {
     // load configuration from EEPROM
     config.load();
 
-    // apply LED config
-    configLeds();
-
     // start display update ticker
-    displayUpdateTicker.attach_ms(40, updateDisplay);
+    displayUpdateTicker.attach_ms(40, []() {
+        display.updateDisplay(transform);
+    });
+
+    applicationState = AS_INIT;
 
     // install WiFi event handlers
     sta_got_ip = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &event) {
-        sta_got_ip_called = true;
+        applicationState = AS_WIFI_GOT_IP;
     });
     sta_disconnected = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected &event) {
-        sta_disconnected_called = true;
+        applicationState = AS_WIFI_DISCONNECTED;
     });
-    ap_sta_connected = WiFi.onSoftAPModeStationConnected([](const WiFiEventSoftAPModeStationConnected &event) {
-        ap_sta_connections++;
-    });
-    ap_sta_disconnected = WiFi.onSoftAPModeStationDisconnected([](const WiFiEventSoftAPModeStationDisconnected &event) {
-        ap_sta_connections--;
-    });
-
-    // enable WiFi and start connecting
-    configureWiFi();
 
     // start web server for configuration
     configServer.onAfterNetworkConfigChange([]() {
@@ -501,33 +450,87 @@ void setup() {
     });
     configServer.begin();
 
-    ArduinoOTA.onStart([]() {
-        setDisplayUpdating(DUSS_UPDATE_IN_PROGRESS);
-    });
-    ArduinoOTA.onEnd([]() {
-        setDisplayUpdating(DUSS_UPDATE_SUCCESSFUL);
-    });
-    ArduinoOTA.onError([](ota_error_t error) {
-        setDisplayUpdating(DUSS_UPDATE_FAILED);
-    });
     ArduinoOTA.begin();
 }
 
+const uint8_t INITIAL_CONNECT_RETRIES = 3;
+
 void loop() {
-    // disable AP and configure event server and subscription when we got an IP
-    if (sta_got_ip_called) {
-        WiFi.enableAP(false);
-        initializeEventServer();
-        sta_got_ip_called = false;
-    }
-    // clean up event server and enable AP when disconnecting from WiFi
-    if (sta_disconnected_called) {
+    static uint8_t remainingConnectRetries = INITIAL_CONNECT_RETRIES;
+    static bool allowIndefiniteWiFiReconnects = false;
+    bool reconnect;
+
+    switch (applicationState) {
+    case AS_INIT:
+        // notify display
+        display.notifyNotReady();
+        applicationState = AS_WIFI_NOT_CONNECTED;
+        break;
+    case AS_WIFI_NOT_CONNECTED:
+        // connect/reconnect WiFi
+        reconnect = false;
+        if (allowIndefiniteWiFiReconnects) {
+            reconnect = true;
+        } else if (remainingConnectRetries) {
+            remainingConnectRetries--;
+            reconnect = true;
+        }
+        if (reconnect && startWiFiStation()) {
+            Serial.println(F("Connecting to WiFi"));
+            applicationState = AS_WIFI_CONNECTING;
+        } else {
+            Serial.println(F("No connection to WiFi - going into AP mode"));
+            applicationState = AS_WIFI_CONNECTING_STOPPED;
+        }
+        break;
+    case AS_WIFI_CONNECTING_STOPPED:
+        // notify display, disable STA and enable AP for configuration
+        display.notifyNotConnected();
+        startWiFiAccessPoint();
+        break;
+    case AS_WIFI_CONNECTING:
+        // nothing to do, state changed by "got ip" or "disconnected" callback
+        break;
+    case AS_WIFI_GOT_IP:
+        // configure event server and subscription when we got an IP
+        startEventServer();
+        applicationState = AS_EVENT_SERVER_STARTED;
+        break;
+    case AS_WIFI_DISCONNECTED:
+        // notify display and destroy event server
+        display.notifyNotReady();
+        Serial.println(F("Disconnected from WiFi"));
         destroyEventServer();
-        WiFi.enableAP(true);
-        sta_disconnected_called = false;
+        applicationState = AS_WIFI_NOT_CONNECTED;
+        break;
+    case AS_EVENT_SERVER_STARTED:
+        // find any Sonos device
+        if (findSonosDeviceIp()) {
+            applicationState = AS_ANY_SPEAKER_FOUND;
+        }
+        break;
+    case AS_ANY_SPEAKER_FOUND:
+        // find correct Sonos device
+        if (findRoomSonosDeviceIp()) {
+            applicationState = AS_ROOM_SPEAKER_FOUND;
+        }
+        break;
+    case AS_ROOM_SPEAKER_FOUND:
+        // subscribe to volume change
+        if (subscribeToVolumeChange()) {
+            applicationState = AS_EVENT_SUBSCRIBED;
+        }
+        break;
+    case AS_EVENT_SUBSCRIBED:
+        // notify the display
+        display.notifyReady();
+        applicationState = AS_READY;
+        break;
+    case AS_READY:
+        // allow indefinite WiFi reconnects
+        allowIndefiniteWiFiReconnects = true;
+        break;
     }
-    // enable STA iff there is no connection to the AP
-    WiFi.enableSTA(!ap_sta_connections);
 
     if (eventServer) {
         eventServer->handleEvent();
