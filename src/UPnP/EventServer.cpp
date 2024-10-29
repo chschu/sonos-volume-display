@@ -170,7 +170,7 @@ static void sendPreconditionFailed(WiFiClient &client) {
 }
 
 void EventServer::handleEvent() {
-	WiFiClient client = available();
+	WiFiClient client = accept();
 	if (client) {
 		// read request line
 		String requestLine = client.readStringUntil('\n');
