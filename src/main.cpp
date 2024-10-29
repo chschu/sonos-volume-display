@@ -118,7 +118,7 @@ public:
         if (_state == _DS_COLOR_CYCLE) {
             // update LEDs
             for (int i = 0; i < LED_COUNT; i++) {
-                _leds[i] = RgbColor::LinearBlend(_leds[i], 0, 20.0/255.0);
+                _leds[i] = RgbColor::LinearBlend(_leds[i], 0, 20.0f/255.0f);
             }
             _leds[_colorCycleLedOffset] = _toRgbColor(COLOR_CYCLE.get(_colorCycleOffset));
 
@@ -171,7 +171,7 @@ public:
 
         const Config::LedConfig &ledConfig = config.led();
         for (int i = 0; i < LED_COUNT; i++) {
-            strip.SetPixelColor(i, colorGamma.Correct(RgbColor::LinearBlend(0, _leds[i], ledConfig.brightness() / 255.0)));
+            strip.SetPixelColor(i, colorGamma.Correct(RgbColor::LinearBlend(0, _leds[i], ledConfig.brightness() / 255.0f)));
         }
 
         strip.Show();
