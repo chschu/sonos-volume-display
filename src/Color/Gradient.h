@@ -9,14 +9,14 @@
 
 namespace Color {
 
-class Gradient: public Pattern {
-public:
-	void set(uint16_t pos, const RGB &rgb);
+class Gradient : public Pattern {
+  public:
+    void set(uint16_t pos, const RGB &rgb);
 
-	RGB get(uint16_t pos) const;
+    RGB get(uint16_t pos) const;
 
-private:
-	std::map<uint16_t, RGB> _rgb;
+  private:
+    std::map<uint16_t, RGB> _rgb;
 };
 
 } /* namespace Color */

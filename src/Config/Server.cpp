@@ -3,8 +3,8 @@
 
 #include "Server.h"
 
-#include <Esp.h>
 #include <ESP8266WiFi.h>
+#include <Esp.h>
 #include <HardwareSerial.h>
 #include <Updater.h>
 
@@ -12,369 +12,359 @@
 #include "../Sonos/Discover.h"
 #include "../Sonos/ZoneGroupTopology.h"
 
+#include "LedConfig.h"
 #include "NetworkConfig.h"
 #include "SonosConfig.h"
-#include "LedConfig.h"
 
 namespace Config {
 
-Server::Server(PersistentConfig &config, IPAddress addr, uint16_t port) :
-		_config(config), _server(addr, port) {
+Server::Server(PersistentConfig &config, IPAddress addr, uint16_t port) : _config(config), _server(addr, port) {
 }
 
-Server::Server(PersistentConfig &config, uint16_t port) :
-		_config(config), _server(port) {
+Server::Server(PersistentConfig &config, uint16_t port) : _config(config), _server(port) {
 }
 
 void Server::begin() {
-	_server.on("/api/info", HTTP_GET, std::bind(&Server::_handleGetApiInfo, this));
-	_server.on("/api/discover/networks", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverNetworks, this));
-	_server.on("/api/discover/rooms", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverRooms, this));
-	_server.on("/api/config/network", HTTP_GET, std::bind(&Server::_handleGetApiConfigNetwork, this));
-	_server.on("/api/config/network", HTTP_POST, std::bind(&Server::_handlePostApiConfigNetwork, this));
-	_server.on("/api/config/sonos", HTTP_GET, std::bind(&Server::_handleGetApiConfigSonos, this));
-	_server.on("/api/config/sonos", HTTP_POST, std::bind(&Server::_handlePostApiConfigSonos, this));
-	_server.on("/api/config/led", HTTP_GET, std::bind(&Server::_handleGetApiConfigLed, this));
-	_server.on("/api/config/led", HTTP_POST, std::bind(&Server::_handlePostApiConfigLed, this));
-	_server.begin();
+    _server.on("/api/info", HTTP_GET, std::bind(&Server::_handleGetApiInfo, this));
+    _server.on("/api/discover/networks", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverNetworks, this));
+    _server.on("/api/discover/rooms", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverRooms, this));
+    _server.on("/api/config/network", HTTP_GET, std::bind(&Server::_handleGetApiConfigNetwork, this));
+    _server.on("/api/config/network", HTTP_POST, std::bind(&Server::_handlePostApiConfigNetwork, this));
+    _server.on("/api/config/sonos", HTTP_GET, std::bind(&Server::_handleGetApiConfigSonos, this));
+    _server.on("/api/config/sonos", HTTP_POST, std::bind(&Server::_handlePostApiConfigSonos, this));
+    _server.on("/api/config/led", HTTP_GET, std::bind(&Server::_handleGetApiConfigLed, this));
+    _server.on("/api/config/led", HTTP_POST, std::bind(&Server::_handlePostApiConfigLed, this));
+    _server.begin();
 }
 
 void Server::handleClient() {
-	_server.handleClient();
+    _server.handleClient();
 }
 
 void Server::stop() {
-	_server.stop();
+    _server.stop();
 }
 
 void Server::onBeforeNetworkConfigChange(Callback callback) {
-	_beforeNetworkConfigChangeCallback = callback;
+    _beforeNetworkConfigChangeCallback = callback;
 }
 
 void Server::onAfterNetworkConfigChange(Callback callback) {
-	_afterNetworkConfigChangeCallback = callback;
+    _afterNetworkConfigChangeCallback = callback;
 }
 
 void Server::onBeforeSonosConfigChange(Callback callback) {
-	_beforeSonosConfigChangeCallback = callback;
+    _beforeSonosConfigChangeCallback = callback;
 }
 
 void Server::onAfterSonosConfigChange(Callback callback) {
-	_afterSonosConfigChangeCallback = callback;
+    _afterSonosConfigChangeCallback = callback;
 }
 
 void Server::onBeforeLedConfigChange(Callback callback) {
-	_beforeLedConfigChangeCallback = callback;
+    _beforeLedConfigChangeCallback = callback;
 }
 
 void Server::onAfterLedConfigChange(Callback callback) {
-	_afterLedConfigChangeCallback = callback;
+    _afterLedConfigChangeCallback = callback;
 }
 
 void Server::_handleGetApiInfo() {
-	JSON::Builder json;
-	json.beginObject();
-	json.attribute(F("boot-mode"), ESP.getBootMode());
-	json.attribute(F("boot-version"), ESP.getBootVersion());
-	json.attribute(F("chip-id"), ESP.getChipId());
-	json.attribute(F("core-version"), ESP.getCoreVersion());
-	json.attribute(F("cpu-freq-mhz"), ESP.getCpuFreqMHz());
-	json.attribute(F("cycle-count"), ESP.getCycleCount());
-	json.attribute(F("flash-chip-id"), ESP.getFlashChipId());
-	json.attribute(F("flash-chip-mode"), ESP.getFlashChipMode());
-	json.attribute(F("flash-chip-real-size"), ESP.getFlashChipRealSize());
-	json.attribute(F("flash-chip-size"), ESP.getFlashChipSize());
-	json.attribute(F("flash-chip-size-by-chip-id"), ESP.getFlashChipSizeByChipId());
-	json.attribute(F("flash-chip-speed"), ESP.getFlashChipSpeed());
-	json.attribute(F("free-heap"), ESP.getFreeHeap());
-	json.attribute(F("free-sketch-space"), ESP.getFreeSketchSpace());
-	json.attribute(F("reset-info"), ESP.getResetInfo());
-	json.attribute(F("reset-reason"), ESP.getResetReason());
-	json.attribute(F("sdk-version"), ESP.getSdkVersion());
-	json.attribute(F("sketch-md5"), ESP.getSketchMD5());
-	json.attribute(F("sketch-size"), ESP.getSketchSize());
-	json.endObject();
-	_server.send(200, F("application/json; charset=utf-8"), json.toString());
+    JSON::Builder json;
+    json.beginObject();
+    json.attribute(F("boot-mode"), ESP.getBootMode());
+    json.attribute(F("boot-version"), ESP.getBootVersion());
+    json.attribute(F("chip-id"), ESP.getChipId());
+    json.attribute(F("core-version"), ESP.getCoreVersion());
+    json.attribute(F("cpu-freq-mhz"), ESP.getCpuFreqMHz());
+    json.attribute(F("cycle-count"), ESP.getCycleCount());
+    json.attribute(F("flash-chip-id"), ESP.getFlashChipId());
+    json.attribute(F("flash-chip-mode"), ESP.getFlashChipMode());
+    json.attribute(F("flash-chip-real-size"), ESP.getFlashChipRealSize());
+    json.attribute(F("flash-chip-size"), ESP.getFlashChipSize());
+    json.attribute(F("flash-chip-size-by-chip-id"), ESP.getFlashChipSizeByChipId());
+    json.attribute(F("flash-chip-speed"), ESP.getFlashChipSpeed());
+    json.attribute(F("free-heap"), ESP.getFreeHeap());
+    json.attribute(F("free-sketch-space"), ESP.getFreeSketchSpace());
+    json.attribute(F("reset-info"), ESP.getResetInfo());
+    json.attribute(F("reset-reason"), ESP.getResetReason());
+    json.attribute(F("sdk-version"), ESP.getSdkVersion());
+    json.attribute(F("sketch-md5"), ESP.getSketchMD5());
+    json.attribute(F("sketch-size"), ESP.getSketchSize());
+    json.endObject();
+    _server.send(200, F("application/json; charset=utf-8"), json.toString());
     _server.client().stop();
 }
 
 void Server::_handleGetApiDiscoverNetworks() {
-	int8_t n = WiFi.scanNetworks();
+    int8_t n = WiFi.scanNetworks();
 
-	if (n >= 0) {
-		JSON::Builder json;
-		json.beginArray();
-		for (uint8_t i = 0; i < n; i++) {
-			json.beginObject();
-			json.attribute(F("ssid"), WiFi.ESP8266WiFiScanClass::SSID(i));
-			json.attribute(F("bssid"), WiFi.ESP8266WiFiScanClass::BSSIDstr(i));
-			json.attribute(F("rssi"), WiFi.ESP8266WiFiScanClass::RSSI(i));
-			json.attribute(F("encrypted"), WiFi.encryptionType(i) != ENC_TYPE_NONE);
-			json.endObject();
-		}
-		json.endArray();
+    if (n >= 0) {
+        JSON::Builder json;
+        json.beginArray();
+        for (uint8_t i = 0; i < n; i++) {
+            json.beginObject();
+            json.attribute(F("ssid"), WiFi.ESP8266WiFiScanClass::SSID(i));
+            json.attribute(F("bssid"), WiFi.ESP8266WiFiScanClass::BSSIDstr(i));
+            json.attribute(F("rssi"), WiFi.ESP8266WiFiScanClass::RSSI(i));
+            json.attribute(F("encrypted"), WiFi.encryptionType(i) != ENC_TYPE_NONE);
+            json.endObject();
+        }
+        json.endArray();
 
-		_server.send(200, F("application/json; charset=utf-8"), json.toString());
-	} else {
-		_server.send(500, F("text/plain"), F("Network Scan Failed"));
-	}
+        _server.send(200, F("application/json; charset=utf-8"), json.toString());
+    } else {
+        _server.send(500, F("text/plain"), F("Network Scan Failed"));
+    }
     _server.client().stop();
 
-	WiFi.scanDelete();
+    WiFi.scanDelete();
 }
 
 void Server::_handleGetApiDiscoverRooms() {
-	IPAddress addr;
-	if (Sonos::Discover::any(&addr)) {
-		Sonos::ZoneGroupTopology topo(addr);
+    IPAddress addr;
+    if (Sonos::Discover::any(&addr)) {
+        Sonos::ZoneGroupTopology topo(addr);
 
-		JSON::Builder json;
-		json.beginArray();
-		bool discoverResult = topo.GetZoneGroupState_Decoded([&json](Sonos::ZoneInfo info) {
-			json.beginObject();
-			json.attribute(F("uuid"), info.uuid);
-			json.attribute(F("name"), info.name);
-			json.attribute(F("ip"), info.playerIP.toString());
-			json.endObject();
-		});
-		json.endArray();
+        JSON::Builder json;
+        json.beginArray();
+        bool discoverResult = topo.GetZoneGroupState_Decoded([&json](Sonos::ZoneInfo info) {
+            json.beginObject();
+            json.attribute(F("uuid"), info.uuid);
+            json.attribute(F("name"), info.name);
+            json.attribute(F("ip"), info.playerIP.toString());
+            json.endObject();
+        });
+        json.endArray();
 
-		if (discoverResult) {
-			_server.send(200, F("application/json; charset=utf-8"), json.toString());
-		} else {
-			_server.send(500, F("text/plain"), F("Error Decoding Discovery Response"));
-		}
-	} else {
-		_server.send(404, F("text/plain"), F("No Devices Found"));
-	}
+        if (discoverResult) {
+            _server.send(200, F("application/json; charset=utf-8"), json.toString());
+        } else {
+            _server.send(500, F("text/plain"), F("Error Decoding Discovery Response"));
+        }
+    } else {
+        _server.send(404, F("text/plain"), F("No Devices Found"));
+    }
     _server.client().stop();
 }
 
 void Server::_handleGetApiConfigNetwork() {
-	_sendResponseNetwork(200);
+    _sendResponseNetwork(200);
 }
 
 void Server::_handlePostApiConfigNetwork() {
-	PersistentConfig copy = _config;
-	NetworkConfig networkConfig = copy.network();
+    PersistentConfig copy = _config;
+    NetworkConfig networkConfig = copy.network();
 
-	if (_handleArg(F("ssid"), networkConfig, &NetworkConfig::setSsid)
-			&& _handleArg(F("passphrase"), networkConfig, &NetworkConfig::setPassphrase)
-			&& _handleArg(F("hostname"), networkConfig, &NetworkConfig::setHostname)) {
+    if (_handleArg(F("ssid"), networkConfig, &NetworkConfig::setSsid) && _handleArg(F("passphrase"), networkConfig, &NetworkConfig::setPassphrase) &&
+        _handleArg(F("hostname"), networkConfig, &NetworkConfig::setHostname)) {
 
-		if (_beforeNetworkConfigChangeCallback) {
-			_beforeNetworkConfigChangeCallback();
-		}
+        if (_beforeNetworkConfigChangeCallback) {
+            _beforeNetworkConfigChangeCallback();
+        }
 
-		// copy modifications back and save
-		_config = copy;
-		_config.save();
+        // copy modifications back and save
+        _config = copy;
+        _config.save();
 
-		_sendResponseNetwork(200);
+        _sendResponseNetwork(200);
 
-		if (_afterNetworkConfigChangeCallback) {
-			_afterNetworkConfigChangeCallback();
-		}
-	} else {
-		_sendResponseNetwork(400);
-	}
+        if (_afterNetworkConfigChangeCallback) {
+            _afterNetworkConfigChangeCallback();
+        }
+    } else {
+        _sendResponseNetwork(400);
+    }
 }
 
 void Server::_handleGetApiConfigSonos() {
-	_sendResponseSonos(200);
+    _sendResponseSonos(200);
 }
 
 void Server::_handlePostApiConfigSonos() {
-	PersistentConfig copy = _config;
-	SonosConfig sonosConfig = copy.sonos();
+    PersistentConfig copy = _config;
+    SonosConfig sonosConfig = copy.sonos();
 
-	if (_handleArg(F("active"), sonosConfig, &SonosConfig::setActive)
-			&& _handleArg(F("room-uuid"), sonosConfig, &SonosConfig::setRoomUuid)) {
-		if (_beforeSonosConfigChangeCallback) {
-			_beforeSonosConfigChangeCallback();
-		}
+    if (_handleArg(F("active"), sonosConfig, &SonosConfig::setActive) && _handleArg(F("room-uuid"), sonosConfig, &SonosConfig::setRoomUuid)) {
+        if (_beforeSonosConfigChangeCallback) {
+            _beforeSonosConfigChangeCallback();
+        }
 
-		// copy modifications back and save
-		_config = copy;
-		_config.save();
+        // copy modifications back and save
+        _config = copy;
+        _config.save();
 
-		_sendResponseSonos(200);
+        _sendResponseSonos(200);
 
-		if (_afterSonosConfigChangeCallback) {
-			_afterSonosConfigChangeCallback();
-		}
-	} else {
-		_sendResponseSonos(400);
-	}
+        if (_afterSonosConfigChangeCallback) {
+            _afterSonosConfigChangeCallback();
+        }
+    } else {
+        _sendResponseSonos(400);
+    }
 }
 
 void Server::_handleGetApiConfigLed() {
-	_sendResponseLed(200);
+    _sendResponseLed(200);
 }
 
 void Server::_handlePostApiConfigLed() {
-	PersistentConfig copy = _config;
-	LedConfig ledConfig = copy.led();
+    PersistentConfig copy = _config;
+    LedConfig ledConfig = copy.led();
 
-	if (_handleArg(F("brightness"), ledConfig, &LedConfig::setBrightness)
-			&& _handleArg(F("transform"), ledConfig, &LedConfig::setTransform)) {
-		if (_beforeLedConfigChangeCallback) {
-			_beforeLedConfigChangeCallback();
-		}
+    if (_handleArg(F("brightness"), ledConfig, &LedConfig::setBrightness) && _handleArg(F("transform"), ledConfig, &LedConfig::setTransform)) {
+        if (_beforeLedConfigChangeCallback) {
+            _beforeLedConfigChangeCallback();
+        }
 
-		// copy modifications back and save
-		_config = copy;
-		_config.save();
+        // copy modifications back and save
+        _config = copy;
+        _config.save();
 
-		_sendResponseLed(200);
+        _sendResponseLed(200);
 
-		if (_afterLedConfigChangeCallback) {
-			_afterLedConfigChangeCallback();
-		}
-	} else {
-		_sendResponseLed(400);
-	}
+        if (_afterLedConfigChangeCallback) {
+            _afterLedConfigChangeCallback();
+        }
+    } else {
+        _sendResponseLed(400);
+    }
 }
 
 void Server::_sendResponseNetwork(int code) {
-	const NetworkConfig &networkConfig = _config.network();
+    const NetworkConfig &networkConfig = _config.network();
 
-	JSON::Builder json;
-	json.beginObject();
-	json.attribute(F("ssid"), networkConfig.ssid());
-	json.attribute(F("passphrase"), F("********"));
-	json.attribute(F("hostname"), networkConfig.hostname());
-	json.attribute(F("status"));
-	json.beginObject();
-	json.attribute(F("connected"), WiFi.isConnected());
-	json.attribute(F("ssid"), WiFi.SSID());
-	json.attribute(F("passphrase"), F("********"));
-	json.attribute(F("hostname"), WiFi.hostname());
-	json.attribute(F("local-ip"), WiFi.localIP().toString());
-	json.attribute(F("gateway-ip"), WiFi.gatewayIP().toString());
-	json.attribute(F("dns-ip"), WiFi.dnsIP().toString());
-	json.attribute(F("bssid"), WiFi.BSSIDstr());
-	json.attribute(F("rssi"), WiFi.RSSI());
-	json.endObject();
-	json.endObject();
+    JSON::Builder json;
+    json.beginObject();
+    json.attribute(F("ssid"), networkConfig.ssid());
+    json.attribute(F("passphrase"), F("********"));
+    json.attribute(F("hostname"), networkConfig.hostname());
+    json.attribute(F("status"));
+    json.beginObject();
+    json.attribute(F("connected"), WiFi.isConnected());
+    json.attribute(F("ssid"), WiFi.SSID());
+    json.attribute(F("passphrase"), F("********"));
+    json.attribute(F("hostname"), WiFi.hostname());
+    json.attribute(F("local-ip"), WiFi.localIP().toString());
+    json.attribute(F("gateway-ip"), WiFi.gatewayIP().toString());
+    json.attribute(F("dns-ip"), WiFi.dnsIP().toString());
+    json.attribute(F("bssid"), WiFi.BSSIDstr());
+    json.attribute(F("rssi"), WiFi.RSSI());
+    json.endObject();
+    json.endObject();
 
-	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+    _server.send(code, F("application/json; charset=utf-8"), json.toString());
     _server.client().stop();
 }
 
 void Server::_sendResponseSonos(int code) {
-	const SonosConfig &sonosConfig = _config.sonos();
+    const SonosConfig &sonosConfig = _config.sonos();
 
-	JSON::Builder json;
-	json.beginObject();
-	json.attribute(F("active"), sonosConfig.active());
-	json.attribute(F("room-uuid"), sonosConfig.roomUuid());
-	json.endObject();
+    JSON::Builder json;
+    json.beginObject();
+    json.attribute(F("active"), sonosConfig.active());
+    json.attribute(F("room-uuid"), sonosConfig.roomUuid());
+    json.endObject();
 
-	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+    _server.send(code, F("application/json; charset=utf-8"), json.toString());
     _server.client().stop();
 }
 
 void Server::_sendResponseLed(int code) {
-	const LedConfig &ledConfig = _config.led();
+    const LedConfig &ledConfig = _config.led();
 
-	JSON::Builder json;
-	json.beginObject();
-	json.attribute(F("brightness"), ledConfig.brightness());
-	json.attribute(F("transform"), ledConfig.transform());
-	json.attribute(F("choices"));
-	json.beginObject();
-	json.attribute(F("transform"));
-	json.beginArray();
-	json.beginObject();
-	json.attribute("id", LedConfig::Transform::IDENTITY);
-	json.attribute("name", F("IDENTITY"));
-	json.attribute("formula", F("x -> x"));
-	json.endObject();
-	json.beginObject();
-	json.attribute("id", LedConfig::Transform::SQUARE);
-	json.attribute("name", F("SQUARE"));
-	json.attribute("formula", F("x -> x * x"));
-	json.endObject();
-	json.beginObject();
-	json.attribute("id", LedConfig::Transform::SQUARE_ROOT);
-	json.attribute("name", F("SQUARE_ROOT"));
-	json.attribute("formula", F("x -> sqrt(x)"));
-	json.endObject();
-	json.beginObject();
-	json.attribute("id", LedConfig::Transform::INVERSE_SQUARE);
-	json.attribute("name", F("INVERSE_SQUARE"));
-	json.attribute("formula", F("x -> 1 - (1 - x) * (1 - x)"));
-	json.endObject();
-	json.endArray();
-	json.endObject();
-	json.endObject();
+    JSON::Builder json;
+    json.beginObject();
+    json.attribute(F("brightness"), ledConfig.brightness());
+    json.attribute(F("transform"), ledConfig.transform());
+    json.attribute(F("choices"));
+    json.beginObject();
+    json.attribute(F("transform"));
+    json.beginArray();
+    json.beginObject();
+    json.attribute("id", LedConfig::Transform::IDENTITY);
+    json.attribute("name", F("IDENTITY"));
+    json.attribute("formula", F("x -> x"));
+    json.endObject();
+    json.beginObject();
+    json.attribute("id", LedConfig::Transform::SQUARE);
+    json.attribute("name", F("SQUARE"));
+    json.attribute("formula", F("x -> x * x"));
+    json.endObject();
+    json.beginObject();
+    json.attribute("id", LedConfig::Transform::SQUARE_ROOT);
+    json.attribute("name", F("SQUARE_ROOT"));
+    json.attribute("formula", F("x -> sqrt(x)"));
+    json.endObject();
+    json.beginObject();
+    json.attribute("id", LedConfig::Transform::INVERSE_SQUARE);
+    json.attribute("name", F("INVERSE_SQUARE"));
+    json.attribute("formula", F("x -> 1 - (1 - x) * (1 - x)"));
+    json.endObject();
+    json.endArray();
+    json.endObject();
+    json.endObject();
 
-	_server.send(code, F("application/json; charset=utf-8"), json.toString());
+    _server.send(code, F("application/json; charset=utf-8"), json.toString());
     _server.client().stop();
 }
 
-template<typename C, typename T>
-bool Server::_handleArg(const String &name, C &config, bool (C::*setter)(T)) {
-	if (!_server.hasArg(name)) {
-		return true;
-	}
-	String valueString = _server.arg(name);
-	T value;
-	return _convert(valueString, &value) && (config.*setter)(value);
+template <typename C, typename T> bool Server::_handleArg(const String &name, C &config, bool (C::*setter)(T)) {
+    if (!_server.hasArg(name)) {
+        return true;
+    }
+    String valueString = _server.arg(name);
+    T value;
+    return _convert(valueString, &value) && (config.*setter)(value);
 }
 
-template<>
-bool Server::_convert(const String &input, bool *output) {
-	String lower = input;
-	lower.toLowerCase();
-	if (lower == "true" || lower == "yes" || lower == "t" || lower == "y" || lower == "1") {
-		*output = true;
-	} else if (lower == "false" || lower == "no" || lower == "f" || lower == "n" || lower == "0") {
-		*output = false;
-	} else {
-		return false;
-	}
-	return true;
+template <> bool Server::_convert(const String &input, bool *output) {
+    String lower = input;
+    lower.toLowerCase();
+    if (lower == "true" || lower == "yes" || lower == "t" || lower == "y" || lower == "1") {
+        *output = true;
+    } else if (lower == "false" || lower == "no" || lower == "f" || lower == "n" || lower == "0") {
+        *output = false;
+    } else {
+        return false;
+    }
+    return true;
 }
 
-template<>
-bool Server::_convert(const String &input, const char **output) {
-	*output = input.c_str();
-	return true;
+template <> bool Server::_convert(const String &input, const char **output) {
+    *output = input.c_str();
+    return true;
 }
 
-template<typename UINT_TYPE>
-bool Server::_convert(const String &input, UINT_TYPE *output) {
-	UINT_TYPE result = 0;
-	const UINT_TYPE maxValue = (std::numeric_limits<UINT_TYPE>::max)();
-	for (const char *p = input.c_str(); *p; p++) {
-		if (!isdigit(*p)) {
-			return false;
-		}
-		if (result > (maxValue - (*p - '0')) / 10) {
-			return false;
-		}
-		result = 10 * result + (*p - '0');
-	}
-	*output = result;
-	return true;
+template <typename UINT_TYPE> bool Server::_convert(const String &input, UINT_TYPE *output) {
+    UINT_TYPE result = 0;
+    const UINT_TYPE maxValue = (std::numeric_limits<UINT_TYPE>::max)();
+    for (const char *p = input.c_str(); *p; p++) {
+        if (!isdigit(*p)) {
+            return false;
+        }
+        if (result > (maxValue - (*p - '0')) / 10) {
+            return false;
+        }
+        result = 10 * result + (*p - '0');
+    }
+    *output = result;
+    return true;
 }
 
-template<>
-bool Server::_convert(const String &input, LedConfig::Transform *output) {
-	if (input == String(LedConfig::Transform::IDENTITY)) {
-		*output = LedConfig::Transform::IDENTITY;
-	} else if (input == String(LedConfig::Transform::SQUARE)) {
-		*output = LedConfig::Transform::SQUARE;
-	} else if (input == String(LedConfig::Transform::SQUARE_ROOT)) {
-		*output = LedConfig::Transform::SQUARE_ROOT;
-	} else if (input == String(LedConfig::Transform::INVERSE_SQUARE)) {
-		*output = LedConfig::Transform::INVERSE_SQUARE;
-	} else {
-		return false;
-	}
-	return true;
+template <> bool Server::_convert(const String &input, LedConfig::Transform *output) {
+    if (input == String(LedConfig::Transform::IDENTITY)) {
+        *output = LedConfig::Transform::IDENTITY;
+    } else if (input == String(LedConfig::Transform::SQUARE)) {
+        *output = LedConfig::Transform::SQUARE;
+    } else if (input == String(LedConfig::Transform::SQUARE_ROOT)) {
+        *output = LedConfig::Transform::SQUARE_ROOT;
+    } else if (input == String(LedConfig::Transform::INVERSE_SQUARE)) {
+        *output = LedConfig::Transform::INVERSE_SQUARE;
+    } else {
+        return false;
+    }
+    return true;
 }
 
 } /* namespace Config */

@@ -8,17 +8,17 @@
 namespace Sonos {
 
 class RenderingControl {
-public:
-	typedef std::function<void(uint16_t volume)> GetVolumeCallback;
+  public:
+    typedef std::function<void(uint16_t volume)> GetVolumeCallback;
 
-	RenderingControl(IPAddress deviceIP);
+    RenderingControl(IPAddress deviceIP);
 
-	bool GetVolume(GetVolumeCallback callback, uint32_t instanceID = 0, const char *channel = "Master");
+    bool GetVolume(GetVolumeCallback callback, uint32_t instanceID = 0, const char *channel = "Master");
 
-private:
-	IPAddress _deviceIP;
+  private:
+    IPAddress _deviceIP;
 };
 
-}
+} // namespace Sonos
 
 #endif /* SONOS_RENDERINGCONTROL_H_ */

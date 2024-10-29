@@ -9,24 +9,24 @@
 namespace Sonos {
 
 struct ZoneInfo {
-	String uuid;
-	String name;
-	IPAddress playerIP;
-	boolean visible;
+    String uuid;
+    String name;
+    IPAddress playerIP;
+    boolean visible;
 };
 
 class ZoneGroupTopology {
-public:
-	typedef std::function<void(ZoneInfo info)> ZoneInfoCallback;
+  public:
+    typedef std::function<void(ZoneInfo info)> ZoneInfoCallback;
 
-	ZoneGroupTopology(IPAddress deviceIP);
+    ZoneGroupTopology(IPAddress deviceIP);
 
-	bool GetZoneGroupState_Decoded(ZoneInfoCallback callback, bool visibleOnly = true);
+    bool GetZoneGroupState_Decoded(ZoneInfoCallback callback, bool visibleOnly = true);
 
-private:
-	IPAddress _deviceIP;
+  private:
+    IPAddress _deviceIP;
 };
 
-}
+} // namespace Sonos
 
 #endif /* SONOS_ZONEGROUPTOPOLOGY_H_ */

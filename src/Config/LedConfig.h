@@ -8,31 +8,31 @@
 namespace Config {
 
 class LedConfig {
-public:
-	enum Transform {
-		IDENTITY, // x -> x
-		SQUARE, // x -> x^2
-		SQUARE_ROOT, // x -> x^(1/2)
-		INVERSE_SQUARE, // x -> 1-(1-x)^2
-	};
+  public:
+    enum Transform {
+        IDENTITY,       // x -> x
+        SQUARE,         // x -> x^2
+        SQUARE_ROOT,    // x -> x^(1/2)
+        INVERSE_SQUARE, // x -> 1-(1-x)^2
+    };
 
-	struct Data {
-		uint8_t brightness;
-		Transform transform;
-	};
+    struct Data {
+        uint8_t brightness;
+        Transform transform;
+    };
 
-	LedConfig(Data &data);
+    LedConfig(Data &data);
 
-	uint8_t brightness() const;
-	bool setBrightness(uint8_t brightness);
+    uint8_t brightness() const;
+    bool setBrightness(uint8_t brightness);
 
-	Transform transform() const;
-	bool setTransform(Transform transform);
+    Transform transform() const;
+    bool setTransform(Transform transform);
 
-	bool reset();
+    bool reset();
 
-private:
-	Data &_data;
+  private:
+    Data &_data;
 };
 
 } /* namespace Config */

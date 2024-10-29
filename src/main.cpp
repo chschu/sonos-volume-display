@@ -1,23 +1,23 @@
 #include <NeoPixelBus.h>
 
 #include <Arduino.h>
-#include <Esp.h>
+#include <ArduinoOTA.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiType.h>
+#include <Esp.h>
 #include <HardwareSerial.h>
 #include <IPAddress.h>
-#include <pins_arduino.h>
 #include <Ticker.h>
-#include <ArduinoOTA.h>
+#include <pins_arduino.h>
 
-#include <stddef.h>
 #include <WString.h>
+#include <cassert>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
-#include <cassert>
 #include <cstring>
 #include <functional>
+#include <stddef.h>
 
 #include "Color/ColorCycle.h"
 #include "Color/Gradient.h"
@@ -69,7 +69,7 @@ struct VolumeState {
 };
 
 class Display {
-public:
+  public:
     void notifyNotReady() {
         if (_state != _DS_COLOR_CYCLE) {
             // reset color cycle
@@ -96,7 +96,7 @@ public:
         _state = _DS_NOT_CONNECTED;
     }
 
-    void notifyVolumeState(const VolumeState &volumeState)  {
+    void notifyVolumeState(const VolumeState &volumeState) {
         // check for changes
         if (volumeState.isComplete() && volumeState != _volumeState) {
             // copy changes to current state
@@ -118,7 +118,7 @@ public:
         if (_state == _DS_COLOR_CYCLE) {
             // update LEDs
             for (int i = 0; i < LED_COUNT; i++) {
-                _leds[i] = RgbColor::LinearBlend(_leds[i], 0, 20.0f/255.0f);
+                _leds[i] = RgbColor::LinearBlend(_leds[i], 0, 20.0f / 255.0f);
             }
             _leds[_colorCycleLedOffset] = _toRgbColor(COLOR_CYCLE.get(_colorCycleOffset));
 
@@ -141,10 +141,7 @@ public:
                 _leds[i] = _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(i));
             }
             if (leftLedInt < LED_COUNT / 2) {
-                _leds[leftLedInt] = RgbColor::LinearBlend(
-                        0,
-                        _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(leftLedInt)),
-                                leftLedFrac);
+                _leds[leftLedInt] = RgbColor::LinearBlend(0, _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(leftLedInt)), leftLedFrac);
             }
 
             float rightLed = LED_COUNT / 2 * transform(_volumeState.master * _volumeState.rf / 10000.0);
@@ -154,10 +151,8 @@ public:
                 _leds[LED_COUNT - 1 - i] = _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(LED_COUNT - 1 - i));
             }
             if (rightLedInt < LED_COUNT / 2) {
-                _leds[LED_COUNT - 1 - rightLedInt] = RgbColor::LinearBlend(
-                        0,
-                        _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(LED_COUNT - 1 - rightLedInt)),
-                                rightLedFrac);
+                _leds[LED_COUNT - 1 - rightLedInt] =
+                    RgbColor::LinearBlend(0, _volumeState.mute ? MUTE_COLOR : _toRgbColor(gradient.get(LED_COUNT - 1 - rightLedInt)), rightLedFrac);
             }
         } else if (_state == _DS_NOTHING) {
             for (int i = 0; i < LED_COUNT; i++) {
@@ -177,7 +172,7 @@ public:
         strip.Show();
     }
 
-private:
+  private:
     enum _DisplayState {
         _DS_COLOR_CYCLE,
         _DS_NOTHING,
@@ -347,8 +342,8 @@ bool findRoomSonosDeviceIp() {
 bool subscribeToVolumeChange() {
     String newSID;
 
-    bool result = eventServer->subscribe(renderingControlEventCallback,
-            "http://" + roomSonosDeviceIp.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
+    bool result =
+        eventServer->subscribe(renderingControlEventCallback, "http://" + roomSonosDeviceIp.toString() + ":1400/MediaRenderer/RenderingControl/Event", &newSID);
 
     if (result) {
         Serial.print(F("Subscribed with new SID "));
@@ -401,9 +396,9 @@ void setup() {
     Serial.begin(115200);
 
     // prepare colors for gradient
-    Color::RGB red = { 255, 0, 0 };
-    Color::RGB green = { 0, 255, 0 };
-    Color::RGB yellow = { 255, 255, 0 };
+    Color::RGB red = {255, 0, 0};
+    Color::RGB green = {0, 255, 0};
+    Color::RGB yellow = {255, 255, 0};
 
     // initialize color gradient for volume
     gradient.set(0 * LED_COUNT / 4, green);
@@ -421,19 +416,13 @@ void setup() {
     config.load();
 
     // start display update ticker
-    displayUpdateTicker.attach_ms(40, []() {
-        display.updateDisplay(transform);
-    });
+    displayUpdateTicker.attach_ms(40, []() { display.updateDisplay(transform); });
 
     applicationState = AS_INIT;
 
     // install WiFi event handlers
-    sta_got_ip = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &event) {
-        applicationState = AS_WIFI_GOT_IP;
-    });
-    sta_disconnected = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected &event) {
-        applicationState = AS_WIFI_DISCONNECTED;
-    });
+    sta_got_ip = WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &event) { applicationState = AS_WIFI_GOT_IP; });
+    sta_disconnected = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected &event) { applicationState = AS_WIFI_DISCONNECTED; });
 
     // start web server for configuration
     configServer.onAfterNetworkConfigChange([]() {

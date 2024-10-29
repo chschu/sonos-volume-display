@@ -8,11 +8,11 @@ namespace Color {
 struct RGB;
 
 class Pattern {
-public:
-	virtual ~Pattern() {
-	}
+  public:
+    virtual ~Pattern() {
+    }
 
-	virtual RGB get(uint16_t pos) const = 0;
+    virtual RGB get(uint16_t pos) const = 0;
 };
 
 } /* namespace Color */

@@ -4,24 +4,24 @@
 namespace Config {
 
 class SonosConfig {
-public:
-	struct Data {
-		bool active;
-		char roomUuid[32];
-	};
+  public:
+    struct Data {
+        bool active;
+        char roomUuid[32];
+    };
 
-	SonosConfig(Data &data);
+    SonosConfig(Data &data);
 
-	bool active() const;
-	bool setActive(bool active);
+    bool active() const;
+    bool setActive(bool active);
 
-	const char *roomUuid() const;
-	bool setRoomUuid(const char *roomUuid);
+    const char *roomUuid() const;
+    bool setRoomUuid(const char *roomUuid);
 
-	bool reset();
+    bool reset();
 
-private:
-	Data &_data;
+  private:
+    Data &_data;
 };
 
 } /* namespace Config */
