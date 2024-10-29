@@ -1,6 +1,7 @@
 #ifndef CONFIG_SERVER_H_
 #define CONFIG_SERVER_H_
 
+#include <ArduinoJson.h>
 #include <ESP8266WebServer.h>
 #include <IPAddress.h>
 #include <WString.h>
@@ -68,6 +69,8 @@ class Server {
     void _sendResponseNetwork(int code);
     void _sendResponseSonos(int code);
     void _sendResponseLed(int code);
+
+    void _sendResponseJson(int code, JsonVariantConst source);
 
     // extract the request argument, call a specialization of _convert(), and pass the result to the setter
     template <typename C, typename T> bool _handleArg(const String &name, C &config, bool (C::*setter)(T));

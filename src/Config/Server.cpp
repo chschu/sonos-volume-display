@@ -3,12 +3,12 @@
 
 #include "Server.h"
 
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <Esp.h>
 #include <HardwareSerial.h>
 #include <Updater.h>
 
-#include "../JSON/Builder.h"
 #include "../Sonos/Discover.h"
 #include "../Sonos/ZoneGroupTopology.h"
 
@@ -70,53 +70,49 @@ void Server::onAfterLedConfigChange(Callback callback) {
 }
 
 void Server::_handleGetApiInfo() {
-    JSON::Builder json;
-    json.beginObject();
-    json.attribute(F("boot-mode"), ESP.getBootMode());
-    json.attribute(F("boot-version"), ESP.getBootVersion());
-    json.attribute(F("chip-id"), ESP.getChipId());
-    json.attribute(F("core-version"), ESP.getCoreVersion());
-    json.attribute(F("cpu-freq-mhz"), ESP.getCpuFreqMHz());
-    json.attribute(F("cycle-count"), ESP.getCycleCount());
-    json.attribute(F("flash-chip-id"), ESP.getFlashChipId());
-    json.attribute(F("flash-chip-mode"), ESP.getFlashChipMode());
-    json.attribute(F("flash-chip-real-size"), ESP.getFlashChipRealSize());
-    json.attribute(F("flash-chip-size"), ESP.getFlashChipSize());
-    json.attribute(F("flash-chip-size-by-chip-id"), ESP.getFlashChipSizeByChipId());
-    json.attribute(F("flash-chip-speed"), ESP.getFlashChipSpeed());
-    json.attribute(F("free-heap"), ESP.getFreeHeap());
-    json.attribute(F("free-sketch-space"), ESP.getFreeSketchSpace());
-    json.attribute(F("reset-info"), ESP.getResetInfo());
-    json.attribute(F("reset-reason"), ESP.getResetReason());
-    json.attribute(F("sdk-version"), ESP.getSdkVersion());
-    json.attribute(F("sketch-md5"), ESP.getSketchMD5());
-    json.attribute(F("sketch-size"), ESP.getSketchSize());
-    json.endObject();
-    _server.send(200, F("application/json; charset=utf-8"), json.toString());
-    _server.client().stop();
+    JsonDocument doc;
+    doc[F("boot-mode")] = ESP.getBootMode();
+    doc[F("boot-version")] = ESP.getBootVersion();
+    doc[F("chip-id")] = ESP.getChipId();
+    doc[F("core-version")] = ESP.getCoreVersion();
+    doc[F("cpu-freq-mhz")] = ESP.getCpuFreqMHz();
+    doc[F("cycle-count")] = ESP.getCycleCount();
+    doc[F("flash-chip-id")] = ESP.getFlashChipId();
+    doc[F("flash-chip-mode")] = ESP.getFlashChipMode();
+    doc[F("flash-chip-real-size")] = ESP.getFlashChipRealSize();
+    doc[F("flash-chip-size")] = ESP.getFlashChipSize();
+    doc[F("flash-chip-size-by-chip-id")] = ESP.getFlashChipSizeByChipId();
+    doc[F("flash-chip-speed")] = ESP.getFlashChipSpeed();
+    doc[F("free-heap")] = ESP.getFreeHeap();
+    doc[F("free-sketch-space")] = ESP.getFreeSketchSpace();
+    doc[F("reset-info")] = ESP.getResetInfo();
+    doc[F("reset-reason")] = ESP.getResetReason();
+    doc[F("sdk-version")] = ESP.getSdkVersion();
+    doc[F("sketch-md5")] = ESP.getSketchMD5();
+    doc[F("sketch-size")] = ESP.getSketchSize();
+
+    _sendResponseJson(200, doc);
 }
 
 void Server::_handleGetApiDiscoverNetworks() {
     int8_t n = WiFi.scanNetworks();
 
     if (n >= 0) {
-        JSON::Builder json;
-        json.beginArray();
+        JsonDocument doc;
+        JsonArray networks = doc.to<JsonArray>();
         for (uint8_t i = 0; i < n; i++) {
-            json.beginObject();
-            json.attribute(F("ssid"), WiFi.ESP8266WiFiScanClass::SSID(i));
-            json.attribute(F("bssid"), WiFi.ESP8266WiFiScanClass::BSSIDstr(i));
-            json.attribute(F("rssi"), WiFi.ESP8266WiFiScanClass::RSSI(i));
-            json.attribute(F("encrypted"), WiFi.encryptionType(i) != ENC_TYPE_NONE);
-            json.endObject();
+            JsonObject network = networks.add<JsonObject>();
+            network[F("ssid")] = WiFi.ESP8266WiFiScanClass::SSID(i);
+            network[F("bssid")] = WiFi.ESP8266WiFiScanClass::BSSIDstr(i);
+            network[F("rssi")] = WiFi.ESP8266WiFiScanClass::RSSI(i);
+            network[F("encrypted")] = WiFi.encryptionType(i) != ENC_TYPE_NONE;
         }
-        json.endArray();
 
-        _server.send(200, F("application/json; charset=utf-8"), json.toString());
+        _sendResponseJson(200, doc);
     } else {
         _server.send(500, F("text/plain"), F("Network Scan Failed"));
+        _server.client().stop();
     }
-    _server.client().stop();
 
     WiFi.scanDelete();
 }
@@ -126,26 +122,25 @@ void Server::_handleGetApiDiscoverRooms() {
     if (Sonos::Discover::any(&addr)) {
         Sonos::ZoneGroupTopology topo(addr);
 
-        JSON::Builder json;
-        json.beginArray();
-        bool discoverResult = topo.GetZoneGroupState_Decoded([&json](Sonos::ZoneInfo info) {
-            json.beginObject();
-            json.attribute(F("uuid"), info.uuid);
-            json.attribute(F("name"), info.name);
-            json.attribute(F("ip"), info.playerIP.toString());
-            json.endObject();
+        JsonDocument doc;
+        JsonArray rooms = doc.to<JsonArray>();
+        bool discoverResult = topo.GetZoneGroupState_Decoded([rooms](Sonos::ZoneInfo info) {
+            JsonObject room = rooms.add<JsonObject>();
+            room[F("uuid")] = info.uuid;
+            room[F("name")] = info.name;
+            room[F("ip")] = info.playerIP.toString();
         });
-        json.endArray();
 
         if (discoverResult) {
-            _server.send(200, F("application/json; charset=utf-8"), json.toString());
+            _sendResponseJson(200, doc);
         } else {
             _server.send(500, F("text/plain"), F("Error Decoding Discovery Response"));
+            _server.client().stop();
         }
     } else {
         _server.send(404, F("text/plain"), F("No Devices Found"));
+        _server.client().stop();
     }
-    _server.client().stop();
 }
 
 void Server::_handleGetApiConfigNetwork() {
@@ -234,79 +229,77 @@ void Server::_handlePostApiConfigLed() {
 void Server::_sendResponseNetwork(int code) {
     const NetworkConfig &networkConfig = _config.network();
 
-    JSON::Builder json;
-    json.beginObject();
-    json.attribute(F("ssid"), networkConfig.ssid());
-    json.attribute(F("passphrase"), F("********"));
-    json.attribute(F("hostname"), networkConfig.hostname());
-    json.attribute(F("status"));
-    json.beginObject();
-    json.attribute(F("connected"), WiFi.isConnected());
-    json.attribute(F("ssid"), WiFi.SSID());
-    json.attribute(F("passphrase"), F("********"));
-    json.attribute(F("hostname"), WiFi.hostname());
-    json.attribute(F("local-ip"), WiFi.localIP().toString());
-    json.attribute(F("gateway-ip"), WiFi.gatewayIP().toString());
-    json.attribute(F("dns-ip"), WiFi.dnsIP().toString());
-    json.attribute(F("bssid"), WiFi.BSSIDstr());
-    json.attribute(F("rssi"), WiFi.RSSI());
-    json.endObject();
-    json.endObject();
+    JsonDocument doc;
+    doc[F("ssid")] = networkConfig.ssid();
+    doc[F("passphrase")] = F("********");
+    doc[F("hostname")] = networkConfig.hostname();
+    JsonObject status = doc[F("status")].to<JsonObject>();
+    status[F("connected")] = WiFi.isConnected();
+    status[F("ssid")] = WiFi.SSID();
+    status[F("passphrase")] = F("********");
+    status[F("hostname")] = WiFi.hostname();
+    status[F("local-ip")] = WiFi.localIP().toString();
+    status[F("gateway-ip")] = WiFi.gatewayIP().toString();
+    status[F("dns-ip")] = WiFi.dnsIP().toString();
+    status[F("bssid")] = WiFi.BSSIDstr();
+    status[F("rssi")] = WiFi.RSSI();
 
-    _server.send(code, F("application/json; charset=utf-8"), json.toString());
-    _server.client().stop();
+    _sendResponseJson(code, doc);
 }
 
 void Server::_sendResponseSonos(int code) {
     const SonosConfig &sonosConfig = _config.sonos();
 
-    JSON::Builder json;
-    json.beginObject();
-    json.attribute(F("active"), sonosConfig.active());
-    json.attribute(F("room-uuid"), sonosConfig.roomUuid());
-    json.endObject();
+    JsonDocument doc;
+    doc[F("active")] = sonosConfig.active();
+    doc[F("room-uuid")] = sonosConfig.roomUuid();
 
-    _server.send(code, F("application/json; charset=utf-8"), json.toString());
-    _server.client().stop();
+    _sendResponseJson(code, doc);
 }
 
 void Server::_sendResponseLed(int code) {
     const LedConfig &ledConfig = _config.led();
 
-    JSON::Builder json;
-    json.beginObject();
-    json.attribute(F("brightness"), ledConfig.brightness());
-    json.attribute(F("transform"), ledConfig.transform());
-    json.attribute(F("choices"));
-    json.beginObject();
-    json.attribute(F("transform"));
-    json.beginArray();
-    json.beginObject();
-    json.attribute("id", LedConfig::Transform::IDENTITY);
-    json.attribute("name", F("IDENTITY"));
-    json.attribute("formula", F("x -> x"));
-    json.endObject();
-    json.beginObject();
-    json.attribute("id", LedConfig::Transform::SQUARE);
-    json.attribute("name", F("SQUARE"));
-    json.attribute("formula", F("x -> x * x"));
-    json.endObject();
-    json.beginObject();
-    json.attribute("id", LedConfig::Transform::SQUARE_ROOT);
-    json.attribute("name", F("SQUARE_ROOT"));
-    json.attribute("formula", F("x -> sqrt(x)"));
-    json.endObject();
-    json.beginObject();
-    json.attribute("id", LedConfig::Transform::INVERSE_SQUARE);
-    json.attribute("name", F("INVERSE_SQUARE"));
-    json.attribute("formula", F("x -> 1 - (1 - x) * (1 - x)"));
-    json.endObject();
-    json.endArray();
-    json.endObject();
-    json.endObject();
+    JsonDocument doc;
+    doc[F("brightness")] = ledConfig.brightness();
+    doc[F("transform")] = ledConfig.transform();
+    JsonObject choices = doc[F("choices")].to<JsonObject>();
+    JsonArray transform = choices[F("transform")].to<JsonArray>();
+    JsonObject identity = transform.add<JsonObject>();
+    identity[F("id")] = LedConfig::Transform::IDENTITY;
+    identity[F("name")] = F("IDENTITY");
+    identity[F("formula")] = F("x -> x");
+    JsonObject square = transform.add<JsonObject>();
+    square[F("id")] = LedConfig::Transform::SQUARE;
+    square[F("name")] = F("SQUARE");
+    square[F("formula")] = F("x -> x * x");
+    JsonObject squareRoot = transform.add<JsonObject>();
+    squareRoot[F("id")] = LedConfig::Transform::SQUARE_ROOT;
+    squareRoot[F("name")] = F("SQUARE_ROOT");
+    squareRoot[F("formula")] = F("x -> sqrt(x)");
+    JsonObject inverseSquare = transform.add<JsonObject>();
+    inverseSquare[F("id")] = LedConfig::Transform::INVERSE_SQUARE;
+    inverseSquare[F("name")] = F("INVERSE_SQUARE");
+    inverseSquare[F("formula")] = F("x -> 1 - (1 - x) * (1 - x)");
 
-    _server.send(code, F("application/json; charset=utf-8"), json.toString());
-    _server.client().stop();
+    _sendResponseJson(code, doc);
+}
+
+void Server::_sendResponseJson(int code, JsonVariantConst source) {
+    auto client = _server.client();
+
+    client.print(F("HTTP/1.1 "));
+    client.print(code);
+    client.print(' ');
+    client.println(_server.responseCodeToString(code));
+    client.println(F("Content-Type: application/json"));
+    client.print(F("Content-Length: "));
+    client.println(measureJsonPretty(source));
+    client.println(F("Connection: close"));
+    client.println();
+    serializeJsonPretty(source, client);
+
+    client.stop();
 }
 
 template <typename C, typename T> bool Server::_handleArg(const String &name, C &config, bool (C::*setter)(T)) {
