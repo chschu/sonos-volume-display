@@ -12,7 +12,7 @@ class ColorCycle : public Pattern {
   public:
     ColorCycle(uint16_t length, uint16_t rOffset, uint16_t gOffset, uint16_t bOffset);
 
-    RGB get(uint16_t pos) const;
+    RGB get(uint16_t pos) const override;
 
   private:
     uint16_t _length;

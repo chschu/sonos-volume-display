@@ -103,7 +103,7 @@ bool EventServer::renew(const String &SID) {
     return _renew(subIt->first, subIt->second);
 }
 
-bool EventServer::_unsubscribe(const String &SID, _Subscription &sub) {
+bool EventServer::_unsubscribe(const String &SID, const _Subscription &sub) {
     bool result = false;
     WiFiClient wifiClient;
     HTTPClient http;

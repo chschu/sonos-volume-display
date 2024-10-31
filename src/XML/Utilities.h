@@ -19,9 +19,9 @@ template <typename T> bool extractEncodedTags(Stream &stream, const char *termin
 
         // find the next &gt; that ends the encoded tag
         const char *endMarker = "&gt;";
-        size_t index = 0;
+        size_t i = 0;
         while (true) {
-            char endMarkerCh = endMarker[index];
+            char endMarkerCh = endMarker[i];
             if (!endMarkerCh) {
                 // tag is complete, replace the XML entities
                 replaceEntities(tag);
@@ -42,10 +42,10 @@ template <typename T> bool extractEncodedTags(Stream &stream, const char *termin
 
             // continuously match endMarker
             if (ch == endMarkerCh) {
-                index++;
+                i++;
             } else {
                 // reset after failed match
-                index = 0;
+                i = 0;
             }
 
             // append read character

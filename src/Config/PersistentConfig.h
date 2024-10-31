@@ -19,7 +19,7 @@ class PersistentConfig {
         uint32_t checksum;
     };
 
-    PersistentConfig(uint32_t magic = 0x51DEB00B);
+    explicit PersistentConfig(uint32_t magic = 0x51DEB00B);
 
     // "views" with validating setters, working on the actual configuration data
     NetworkConfig network();

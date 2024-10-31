@@ -21,7 +21,7 @@ class LedConfig {
         Transform transform;
     };
 
-    LedConfig(Data &data);
+    explicit LedConfig(Data &data);
 
     uint8_t brightness() const;
     bool setBrightness(uint8_t brightness);

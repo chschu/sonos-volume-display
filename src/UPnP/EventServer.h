@@ -16,8 +16,8 @@ typedef std::function<void(String SID, Stream &stream)> EventCallback;
 
 class EventServer : public WiFiServer {
   public:
-    EventServer(const IPAddress &addr, uint16_t callbackPort = 1400);
-    EventServer(uint16_t callbackPort = 1400);
+    explicit EventServer(const IPAddress &addr, uint16_t callbackPort = 1400);
+    explicit EventServer(uint16_t callbackPort = 1400);
 
     // subscribe to an event at the endpoint defined via subscriptionURL
     // should be called after begin() to avoid missing the initial event
@@ -57,7 +57,7 @@ class EventServer : public WiFiServer {
     };
 
     bool _renew(const String &SID, _Subscription &sub);
-    bool _unsubscribe(const String &SID, _Subscription &sub);
+    bool _unsubscribe(const String &SID, const _Subscription &sub);
 
     uint16_t _callbackPort;
     std::map<String, _Subscription> _subscriptionForSID;

@@ -11,7 +11,7 @@ class NetworkConfig {
         char hostname[33];
     };
 
-    NetworkConfig(Data &data);
+    explicit NetworkConfig(Data &data);
 
     const char *ssid() const;
     bool setSsid(const char *ssid);

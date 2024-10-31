@@ -13,7 +13,7 @@ class Gradient : public Pattern {
   public:
     void set(uint16_t pos, const RGB &rgb);
 
-    RGB get(uint16_t pos) const;
+    RGB get(uint16_t pos) const override;
 
   private:
     std::map<uint16_t, RGB> _rgb;
