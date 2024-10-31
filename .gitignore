@@ -1,7 +1,7 @@
 # PlatformIO
 /.pio/
 /.vscode/
+/platformio_override.ini
 
 # macOS
 .DS_Store
-
