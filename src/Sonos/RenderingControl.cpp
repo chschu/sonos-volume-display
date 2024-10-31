@@ -45,10 +45,10 @@ bool RenderingControl::GetVolume(GetVolumeCallback callback, uint32_t instanceID
 
         if (stream.find("<CurrentVolume>")) {
             // TODO read only until next '<' and check format
-            int volume = stream.parseInt();
+            long volume = stream.parseInt();
             // must fit into an uint16_t
-            if (volume >= 0 || volume <= 65535) {
-                callback(volume);
+            if (volume >= 0 && volume <= 65535) {
+                callback(static_cast<uint16_t>(volume));
                 result = true;
             }
         } else {
