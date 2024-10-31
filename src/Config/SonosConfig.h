@@ -10,7 +10,7 @@ class SonosConfig {
         char roomUuid[32];
     };
 
-    SonosConfig(Data &data);
+    explicit SonosConfig(Data &data);
 
     bool active() const;
     bool setActive(bool active);

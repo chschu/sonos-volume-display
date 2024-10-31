@@ -18,8 +18,8 @@ class Server {
   public:
     typedef std::function<void()> Callback;
 
-    Server(PersistentConfig &config, IPAddress addr, uint16_t port = 80);
-    Server(PersistentConfig &config, uint16_t port = 80);
+    explicit Server(PersistentConfig &config, IPAddress addr, uint16_t port = 80);
+    explicit Server(PersistentConfig &config, uint16_t port = 80);
 
     void begin();
     void handleClient();

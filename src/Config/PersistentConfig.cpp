@@ -36,8 +36,7 @@ static uint32_t crc32(const void *data, size_t length) {
 }
 
 void PersistentConfig::load() {
-    // the static_cast is just for Eclipse CDT; it doesn't accept std::size_t for the ::size_t parameter
-    EEPROM.begin(static_cast<size_t>(sizeof(_data)));
+    EEPROM.begin(sizeof(_data));
     EEPROM.get(0, _data);
     uint32_t checksum = crc32(&_data, offsetof(Data, checksum));
     if (_data.magic == _magic && _data.checksum == checksum) {
@@ -58,8 +57,7 @@ void PersistentConfig::load() {
 }
 
 void PersistentConfig::save() {
-    // the static_cast is just for Eclipse CDT; it doesn't accept std::size_t for the ::size_t parameter
-    EEPROM.begin(static_cast<size_t>(sizeof(_data)));
+    EEPROM.begin(sizeof(_data));
     _data.magic = _magic;
     _data.checksum = crc32(&_data, offsetof(Data, checksum));
     EEPROM.put(0, _data);

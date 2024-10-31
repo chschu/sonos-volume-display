@@ -11,7 +11,7 @@ class RenderingControl {
   public:
     typedef std::function<void(uint16_t volume)> GetVolumeCallback;
 
-    RenderingControl(IPAddress deviceIP);
+    explicit RenderingControl(IPAddress deviceIP);
 
     bool GetVolume(GetVolumeCallback callback, uint32_t instanceID = 0, const char *channel = "Master");
 
