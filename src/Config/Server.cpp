@@ -90,15 +90,13 @@ void Server::_handleGetApiInfo() {
     doc[F("sdk-version")] = ESP.getSdkVersion();
     doc[F("sketch-md5")] = ESP.getSketchMD5();
     doc[F("sketch-size")] = ESP.getSketchSize();
-
     _sendResponseJson(200, doc);
 }
 
 void Server::_handleGetApiDiscoverNetworks() {
+    JsonDocument doc;
     int8_t n = WiFi.scanNetworks();
-
     if (n >= 0) {
-        JsonDocument doc;
         JsonArray networks = doc.to<JsonArray>();
         for (uint8_t i = 0; i < n; i++) {
             JsonObject network = networks.add<JsonObject>();
@@ -107,22 +105,21 @@ void Server::_handleGetApiDiscoverNetworks() {
             network[F("rssi")] = WiFi.ESP8266WiFiScanClass::RSSI(i);
             network[F("encrypted")] = WiFi.encryptionType(i) != ENC_TYPE_NONE;
         }
-
         _sendResponseJson(200, doc);
     } else {
-        _server.send(500, F("text/plain"), F("Network Scan Failed"));
-        _server.client().stop();
+        doc[F("error")] = F("Network Scan Failed");
+        _sendResponseJson(500, doc);
     }
 
     WiFi.scanDelete();
 }
 
 void Server::_handleGetApiDiscoverRooms() {
+    JsonDocument doc;
     IPAddress addr;
     if (Sonos::Discover::any(&addr)) {
         Sonos::ZoneGroupTopology topo(addr);
 
-        JsonDocument doc;
         JsonArray rooms = doc.to<JsonArray>();
         bool discoverResult = topo.GetZoneGroupState_Decoded([rooms](Sonos::ZoneInfo info) {
             JsonObject room = rooms.add<JsonObject>();
@@ -134,12 +131,12 @@ void Server::_handleGetApiDiscoverRooms() {
         if (discoverResult) {
             _sendResponseJson(200, doc);
         } else {
-            _server.send(500, F("text/plain"), F("Error Decoding Discovery Response"));
-            _server.client().stop();
+            doc[F("error")] = F("Error Decoding Discovery Response");
+            _sendResponseJson(500, doc);
         }
     } else {
-        _server.send(404, F("text/plain"), F("No Devices Found"));
-        _server.client().stop();
+        doc[F("error")] = F("No Devices Found");
+        _sendResponseJson(404, doc);
     }
 }
 
@@ -243,7 +240,6 @@ void Server::_sendResponseNetwork(int code) {
     status[F("dns-ip")] = WiFi.dnsIP().toString();
     status[F("bssid")] = WiFi.BSSIDstr();
     status[F("rssi")] = WiFi.RSSI();
-
     _sendResponseJson(code, doc);
 }
 
@@ -253,7 +249,6 @@ void Server::_sendResponseSonos(int code) {
     JsonDocument doc;
     doc[F("active")] = sonosConfig.active();
     doc[F("room-uuid")] = sonosConfig.roomUuid();
-
     _sendResponseJson(code, doc);
 }
 
@@ -281,7 +276,6 @@ void Server::_sendResponseLed(int code) {
     inverseSquare[F("id")] = LedConfig::Transform::INVERSE_SQUARE;
     inverseSquare[F("name")] = F("INVERSE_SQUARE");
     inverseSquare[F("formula")] = F("x -> 1 - (1 - x) * (1 - x)");
-
     _sendResponseJson(code, doc);
 }
 
