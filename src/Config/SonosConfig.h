@@ -20,6 +20,9 @@ class SonosConfig {
 
     bool reset();
 
+    bool operator==(const SonosConfig &other) const;
+    bool operator!=(const SonosConfig &other) const;
+
   private:
     Data &_data;
 };

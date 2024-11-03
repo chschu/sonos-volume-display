@@ -31,6 +31,9 @@ class LedConfig {
 
     bool reset();
 
+    bool operator==(const LedConfig &other) const;
+    bool operator!=(const LedConfig &other) const;
+
   private:
     Data &_data;
 };

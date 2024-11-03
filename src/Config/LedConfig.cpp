@@ -1,5 +1,7 @@
 #include "LedConfig.h"
 
+#include <cstring>
+
 namespace Config {
 
 LedConfig::LedConfig(Data &data) : _data(data) {
@@ -28,6 +30,14 @@ bool LedConfig::setTransform(Transform transform) {
 
 bool LedConfig::reset() {
     return setBrightness(255) && setTransform(Transform::IDENTITY);
+}
+
+bool LedConfig::operator==(const LedConfig &other) const {
+    return _data.brightness == other._data.brightness && _data.transform == other._data.transform;
+}
+
+bool LedConfig::operator!=(const LedConfig &other) const {
+    return !(*this == other);
 }
 
 } /* namespace Config */

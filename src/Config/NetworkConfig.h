@@ -24,6 +24,9 @@ class NetworkConfig {
 
     bool reset();
 
+    bool operator==(const NetworkConfig &other) const;
+    bool operator!=(const NetworkConfig &other) const;
+
   private:
     Data &_data;
 };

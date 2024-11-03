@@ -64,4 +64,14 @@ bool NetworkConfig::reset() {
     return setSsid("") && setPassphrase("") && setHostname(defaultHostname.c_str());
 }
 
+bool NetworkConfig::operator==(const NetworkConfig &other) const {
+    return std::strncmp(_data.ssid, other._data.ssid, sizeof(_data.ssid)) == 0 &&
+           std::strncmp(_data.passphrase, other._data.passphrase, sizeof(_data.passphrase)) == 0 &&
+           std::strncmp(_data.hostname, other._data.hostname, sizeof(_data.hostname)) == 0;
+}
+
+bool NetworkConfig::operator!=(const NetworkConfig &other) const {
+    return !(*this == other);
+}
+
 } /* namespace Config */

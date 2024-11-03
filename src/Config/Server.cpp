@@ -150,19 +150,22 @@ void Server::_handlePostApiConfigNetwork() {
 
     if (_handleArg(F("ssid"), networkConfig, &NetworkConfig::setSsid) && _handleArg(F("passphrase"), networkConfig, &NetworkConfig::setPassphrase) &&
         _handleArg(F("hostname"), networkConfig, &NetworkConfig::setHostname)) {
+        if (networkConfig != _config.network()) {
+            if (_beforeNetworkConfigChangeCallback) {
+                _beforeNetworkConfigChangeCallback();
+            }
 
-        if (_beforeNetworkConfigChangeCallback) {
-            _beforeNetworkConfigChangeCallback();
-        }
+            // copy modifications back and save
+            _config = copy;
+            _config.save();
 
-        // copy modifications back and save
-        _config = copy;
-        _config.save();
+            _sendResponseNetwork(200);
 
-        _sendResponseNetwork(200);
-
-        if (_afterNetworkConfigChangeCallback) {
-            _afterNetworkConfigChangeCallback();
+            if (_afterNetworkConfigChangeCallback) {
+                _afterNetworkConfigChangeCallback();
+            }
+        } else {
+            _sendResponseSonos(200);
         }
     } else {
         _sendResponseNetwork(400);
@@ -178,18 +181,22 @@ void Server::_handlePostApiConfigSonos() {
     SonosConfig sonosConfig = copy.sonos();
 
     if (_handleArg(F("active"), sonosConfig, &SonosConfig::setActive) && _handleArg(F("room-uuid"), sonosConfig, &SonosConfig::setRoomUuid)) {
-        if (_beforeSonosConfigChangeCallback) {
-            _beforeSonosConfigChangeCallback();
-        }
+        if (sonosConfig != _config.sonos()) {
+            if (_beforeSonosConfigChangeCallback) {
+                _beforeSonosConfigChangeCallback();
+            }
 
-        // copy modifications back and save
-        _config = copy;
-        _config.save();
+            // copy modifications back and save
+            _config = copy;
+            _config.save();
 
-        _sendResponseSonos(200);
+            _sendResponseSonos(200);
 
-        if (_afterSonosConfigChangeCallback) {
-            _afterSonosConfigChangeCallback();
+            if (_afterSonosConfigChangeCallback) {
+                _afterSonosConfigChangeCallback();
+            }
+        } else {
+            _sendResponseSonos(200);
         }
     } else {
         _sendResponseSonos(400);
@@ -205,18 +212,22 @@ void Server::_handlePostApiConfigLed() {
     LedConfig ledConfig = copy.led();
 
     if (_handleArg(F("brightness"), ledConfig, &LedConfig::setBrightness) && _handleArg(F("transform"), ledConfig, &LedConfig::setTransform)) {
-        if (_beforeLedConfigChangeCallback) {
-            _beforeLedConfigChangeCallback();
-        }
+        if (ledConfig != _config.led()) {
+            if (_beforeLedConfigChangeCallback) {
+                _beforeLedConfigChangeCallback();
+            }
 
-        // copy modifications back and save
-        _config = copy;
-        _config.save();
+            // copy modifications back and save
+            _config = copy;
+            _config.save();
 
-        _sendResponseLed(200);
+            _sendResponseLed(200);
 
-        if (_afterLedConfigChangeCallback) {
-            _afterLedConfigChangeCallback();
+            if (_afterLedConfigChangeCallback) {
+                _afterLedConfigChangeCallback();
+            }
+        } else {
+            _sendResponseLed(200);
         }
     } else {
         _sendResponseLed(400);
