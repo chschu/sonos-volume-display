@@ -76,8 +76,8 @@ class Display {
             for (int i = 0; i < LED_COUNT; i++) {
                 _leds[i] = RgbColor(0, 0, 0);
             }
-            _colorCycleLedOffset = -1;
-            _colorCycleOffset = -1;
+            _colorCycleLedOffset = 0;
+            _colorCycleOffset = 0;
 
             _state = _DS_COLOR_CYCLE;
         }
