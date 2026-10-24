@@ -165,7 +165,7 @@ void Server::_handlePostApiConfigNetwork() {
                 _afterNetworkConfigChangeCallback();
             }
         } else {
-            _sendResponseSonos(200);
+            _sendResponseNetwork(200);
         }
     } else {
         _sendResponseNetwork(400);
