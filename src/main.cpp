@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
+#include <DNSServer.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiType.h>
 #include <Esp.h>
@@ -40,6 +41,7 @@ const uint8_t LED_PIN = D1;
 Config::PersistentConfig config;
 Config::Server configServer(config);
 std::unique_ptr<UPnP::EventServer> eventServer;
+std::unique_ptr<DNSServer> dnsServer;
 Color::Gradient gradient;
 
 NeoGamma<NeoGammaTableMethod> colorGamma;
@@ -291,6 +293,11 @@ bool startWiFiStation() {
 void startWiFiAccessPoint() {
     WiFi.mode(WIFI_AP);
     WiFi.softAP(AP_SSID.c_str(), F("q1w2e3r4"));
+    if (!dnsServer) {
+        // redirect all DNS lookups to ourselves, so captive portal detection pops up the config UI
+        dnsServer.reset(new DNSServer());
+        dnsServer->start(53, "*", WiFi.softAPIP());
+    }
 }
 
 void startEventServer() {
@@ -523,6 +530,9 @@ void loop() {
 
     if (eventServer) {
         eventServer->handleEvent();
+    }
+    if (dnsServer) {
+        dnsServer->processNextRequest();
     }
     configServer.handleClient();
 

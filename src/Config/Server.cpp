@@ -15,6 +15,7 @@
 #include "LedConfig.h"
 #include "NetworkConfig.h"
 #include "SonosConfig.h"
+#include "WebUI.h"
 
 namespace Config {
 
@@ -25,6 +26,8 @@ Server::Server(PersistentConfig &config, uint16_t port) : _config(config), _serv
 }
 
 void Server::begin() {
+    _server.on("/", HTTP_GET, std::bind(&Server::_handleGetRoot, this));
+    _server.onNotFound(std::bind(&Server::_handleNotFound, this));
     _server.on("/api/info", HTTP_GET, std::bind(&Server::_handleGetApiInfo, this));
     _server.on("/api/discover/networks", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverNetworks, this));
     _server.on("/api/discover/rooms", HTTP_GET, std::bind(&Server::_handleGetApiDiscoverRooms, this));
@@ -67,6 +70,20 @@ void Server::onBeforeLedConfigChange(Callback callback) {
 
 void Server::onAfterLedConfigChange(Callback callback) {
     _afterLedConfigChangeCallback = callback;
+}
+
+void Server::_handleGetRoot() {
+    _server.send_P(200, PSTR("text/html"), WebUI::INDEX_HTML);
+}
+
+void Server::_handleNotFound() {
+    if (WiFi.getMode() & WIFI_AP) {
+        // redirect captive portal probe requests to the config UI
+        _server.sendHeader(F("Location"), String(F("http://")) + WiFi.softAPIP().toString() + '/', true);
+        _server.send(302, F("text/plain"), F(""));
+    } else {
+        _server.send(404, F("text/plain"), F("Not Found"));
+    }
 }
 
 void Server::_handleGetApiInfo() {

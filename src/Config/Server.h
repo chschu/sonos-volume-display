@@ -51,6 +51,9 @@ class Server {
     Callback _beforeLedConfigChangeCallback;
     Callback _afterLedConfigChangeCallback;
 
+    void _handleGetRoot();
+    void _handleNotFound();
+
     void _handleGetApiInfo();
 
     void _handleGetApiDiscoverNetworks();
